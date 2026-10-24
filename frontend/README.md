@@ -1,16 +1,31 @@
-# React + Vite
+# Casa de Leilões
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Teste técnico Full Stack Elite Dev da Verzel: plataforma de leilões online com dois papéis (leiloeiro e licitante).
 
-Currently, two official plugins are available:
+## Links
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Front (deploy): https://teste-fullstack-verzel.vercel.app
+- API (deploy): https://teste-fullstack-verzel.onrender.com
 
-## React Compiler
+## Contas de teste
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+(a preencher quando o seed estiver pronto)
 
-## Expanding the Oxlint configuration
+## Stack
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+- Front: React + Vite
+- Back: Node.js + Express
+- Banco: PostgreSQL (Neon)
+- Deploy: Vercel (front) e Render (back)
+
+## Como rodar localmente
+
+(a preencher)
+
+## Variáveis de ambiente
+
+Veja `backend/.env.example` e `frontend/.env.example`.
+
+## Uso de IA
+
+(a preencher)
