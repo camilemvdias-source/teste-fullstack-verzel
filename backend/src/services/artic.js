@@ -70,3 +70,47 @@ export async function searchArtworks(query) {
     throw new ExternalApiError(err.message);
   }
 }
+
+// Busca os detalhes de UMA obra, para copiar os dados para o nosso banco
+// na hora de criar o lote. Devolve null se a obra não existe ou não tem imagem.
+export async function getArtwork(id) {
+  try {
+    const params = new URLSearchParams({
+      fields:
+        'id,title,artist_display,date_display,medium_display,dimensions,place_of_origin,image_id',
+    });
+
+    const response = await fetch(`${API_URL}/artworks/${id}?${params}`, {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`A API respondeu com status ${response.status}`);
+    }
+
+    const json = await response.json();
+    const art = json.data;
+    if (!art || !art.image_id) return null;
+
+    const iiifUrl = json.config?.iiif_url || DEFAULT_IIIF_URL;
+
+    return {
+      externalId: String(art.id),
+      title: art.title,
+      imageUrl: `${iiifUrl}/${art.image_id}/full/843,/0/default.jpg`,
+      attributes: {
+        artist: art.artist_display ?? null,
+        date: art.date_display ?? null,
+        medium: art.medium_display ?? null,
+        dimensions: art.dimensions ?? null,
+        placeOfOrigin: art.place_of_origin ?? null,
+        source: 'Art Institute of Chicago',
+        sourceUrl: `https://www.artic.edu/artworks/${art.id}`,
+      },
+    };
+  } catch (err) {
+    throw new ExternalApiError(err.message);
+  }
+}

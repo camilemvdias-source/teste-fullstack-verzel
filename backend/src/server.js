@@ -5,7 +5,8 @@ import { pool } from './db/pool.js';
 import authRoutes from './routes/auth.js';
 import meRoutes from './routes/me.js';
 import externalRoutes from './routes/external.js';
-import { requireAuth, requireRole } from './middleware/auth.js';
+import lotsRoutes from './routes/lots.js';
+import lotActionsRoutes from './routes/lotActions.js';
 
 const app = express();
 
@@ -21,14 +22,8 @@ app.use(express.json());
 app.use('/auth', authRoutes);
 app.use('/me', meRoutes);
 app.use('/external', externalRoutes);
-
-// TEMPORÁRIO: só para testar os papéis (remover quando o POST /lots existir)
-app.get('/teste/leiloeiro', requireAuth, requireRole('auctioneer'), (req, res) => {
-  res.json({ ok: true, mensagem: 'Área do leiloeiro' });
-});
-app.get('/teste/licitante', requireAuth, requireRole('bidder'), (req, res) => {
-  res.json({ ok: true, mensagem: 'Área do licitante' });
-});
+app.use('/lots', lotsRoutes);
+app.use('/lots', lotActionsRoutes);
 
 app.get('/health', async (req, res) => {
   try {
