@@ -1,21 +1,16 @@
-import { useEffect, useState } from 'react';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { Route, Routes } from 'react-router-dom';
+import Layout from './components/Layout.jsx';
+import Home from './pages/Home.jsx';
+import Login from './pages/Login.jsx';
 
 export default function App() {
-  const [status, setStatus] = useState('carregando...');
-
-  useEffect(() => {
-    fetch(`${API_URL}/health`)
-      .then((res) => res.json())
-      .then((data) => setStatus(JSON.stringify(data)))
-      .catch(() => setStatus('erro ao falar com a API'));
-  }, []);
-
   return (
-    <div style={{ padding: 24 }}>
-      <h1>Casa de Leilões</h1>
-      <p>Resposta da API: {status}</p>
-    </div>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route index element={<Home />} />
+        <Route path="login" element={<Login />} />
+        <Route path="*" element={<p className="center muted">Página não encontrada.</p>} />
+      </Route>
+    </Routes>
   );
 }
