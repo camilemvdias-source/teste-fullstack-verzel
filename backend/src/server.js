@@ -9,6 +9,10 @@ import lotsRoutes from './routes/lots.js';
 import lotActionsRoutes from './routes/lotActions.js';
 import bidsRoutes from './routes/bids.js';
 import walletRoutes from './routes/wallet.js';
+import auditRoutes from './routes/audit.js';
+import receiptsRoutes from './routes/receipts.js';
+import myActivityRoutes from './routes/myActivity.js';
+import myLotsRoutes from './routes/myLots.js';
 import { settleExpiredLots } from './services/settlement.js';
 
 const app = express();
@@ -24,11 +28,15 @@ app.use(express.json());
 
 app.use('/auth', authRoutes);
 app.use('/me', meRoutes);
+app.use('/me', myActivityRoutes);
+app.use('/my-lots', myLotsRoutes);
 app.use('/external', externalRoutes);
 app.use('/lots', lotsRoutes);
 app.use('/lots', lotActionsRoutes);
 app.use('/lots', bidsRoutes);
 app.use('/wallet', walletRoutes);
+app.use('/audit', auditRoutes);
+app.use('/receipts', receiptsRoutes);
 
 app.get('/health', async (req, res) => {
   try {
