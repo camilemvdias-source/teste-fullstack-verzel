@@ -7,7 +7,7 @@ const TIMEOUT_MS = 5000;
 
 // O museu usa uma proteção anti-robô (Cloudflare). Sem identificar o app, a API
 // responde 403 ("Just a moment..."). Com estes cabeçalhos a busca passa.
-const HEADERS = {
+export const HEADERS = {
   'User-Agent': 'CasaDeLeiloes/1.0 (teste tecnico Verzel)',
   'AIC-User-Agent': 'CasaDeLeiloes (teste tecnico Verzel)',
 };

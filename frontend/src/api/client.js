@@ -1,5 +1,5 @@
 // Único lugar que fala com a API. Coloca o token JWT no header Authorization.
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+export const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 const TOKEN_KEY = 'leilao_token';
 
 export function getToken() {

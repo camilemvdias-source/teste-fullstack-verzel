@@ -11,7 +11,15 @@ Teste técnico Full Stack Elite Dev da Verzel: plataforma de leilões online com
 
 ## Contas de teste
 
-As contas de teste serão adicionadas quando estiverem configuradas.
+Criadas pelo seed (`npm run seed` dentro de `backend`). Senha de todas: `Leilao@2026`.
+
+| Papel | E-mail | Saldo inicial |
+|---|---|---|
+| Leiloeiro | `leiloeiro@teste.com` | R$ 0,00 |
+| Licitante | `licitante1@teste.com` | R$ 10.000,00 |
+| Licitante | `licitante2@teste.com` | R$ 10.000,00 |
+
+Também é possível criar contas novas pela tela de cadastro.
 
 ## Stack
 
@@ -19,6 +27,22 @@ As contas de teste serão adicionadas quando estiverem configuradas.
 - **Back-end:** Node.js + Express
 - **Banco de dados:** PostgreSQL (Neon)
 - **Deploy:** Vercel (front-end) e Render (back-end)
+
+## Telas do front-end
+
+| Rota | Quem acessa | O que faz |
+|---|---|---|
+| `/` | público | Vitrine: lotes ao vivo, agendados e encerrados |
+| `/lotes/:id` | público | Detalhe do lote, contagem regressiva e lances (licitante) |
+| `/login` | público | Entrar e cadastrar |
+| `/carteira` | logado | Saldo, depósito (licitante) e extrato |
+| `/meus-lances` | licitante | Situação de cada lance e lotes arrematados |
+| `/meus-lotes` | leiloeiro | Meus lotes, resultado e cancelamento |
+| `/meus-lotes/novo` | leiloeiro | Busca a obra no museu e cria o lote |
+| `/comprovante/:token` | público | Comprovante de arremate |
+| `/auditoria/:lotId` | público | Histórico de lances e verificação da cadeia de selos |
+
+As imagens das obras passam pela API (`GET /lots/:id/image`), porque o museu bloqueia o carregamento direto pelo navegador.
 
 ## Como rodar localmente
 
@@ -181,3 +205,8 @@ npm run e2e -- check <id>       # testa liquidação, comprovante e extratos
 
 Para apontar para outra API, defina `API_URL` (por exemplo, a do Render).
 
+## Deploy
+
+- **Front-end (Vercel):** pasta raiz `frontend`, variável `VITE_API_URL` com o endereço da API no Render (sem barra no final). O `vercel.json` já redireciona todas as rotas para o `index.html`.
+- **Back-end (Render):** pasta raiz `backend`, comando de início `npm start`, variáveis `DATABASE_URL`, `JWT_SECRET`, `PUBLIC_CODE_SECRET` e `FRONTEND_URL` (endereço da Vercel).
+- **Banco (Neon):** rode `npm run migrate` e `npm run seed` uma vez apontando para o banco de produção.

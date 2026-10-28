@@ -38,14 +38,23 @@ export function AuthProvider({ children }) {
     [login]
   );
 
+  // Recarrega nome e saldo (depois de um lance ou depósito)
+  const refreshUser = useCallback(async () => {
+    try {
+      setUser(await api('/me'));
+    } catch {
+      /* se o token venceu, o client já avisa o app */
+    }
+  }, []);
+
   const logout = useCallback(() => {
     clearToken();
     setUser(null);
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, register, logout }),
-    [user, loading, login, register, logout]
+    () => ({ user, loading, login, register, logout, refreshUser }),
+    [user, loading, login, register, logout, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

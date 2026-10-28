@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { getArtwork, ExternalApiError } from '../services/artic.js';
+import { getArtwork, ExternalApiError, HEADERS as ARTIC_HEADERS } from '../services/artic.js';
 
 const router = Router();
 
@@ -193,6 +193,56 @@ router.get('/:id', async (req, res) => {
   } catch (err) {
     console.error('Erro ao buscar lote:', err.code, err.message);
     res.status(500).json({ error: 'Erro interno' });
+  }
+});
+
+// Imagem do lote, servida pela nossa API. O museu bloqueia imagens pedidas direto
+// pelo navegador de outros sites; aqui o servidor busca com os cabeçalhos certos.
+// Só aceita a URL já gravada no lote e só do domínio do museu (não é um proxy aberto).
+const imageCache = new Map();
+const IMAGE_CACHE_MAX = 200;
+
+router.get('/:id/image', async (req, res) => {
+  const id = idSchema.safeParse(req.params.id);
+  if (!id.success) return res.status(400).json({ error: 'Id inválido' });
+
+  try {
+    let img = imageCache.get(id.data);
+
+    if (!img) {
+      const result = await pool.query('SELECT image_url FROM lots WHERE id = $1', [id.data]);
+      const url = result.rows[0]?.image_url;
+      if (!url) return res.status(404).json({ error: 'Imagem não encontrada' });
+
+      const host = new URL(url).hostname;
+      if (host !== 'artic.edu' && !host.endsWith('.artic.edu')) {
+        return res.status(404).json({ error: 'Imagem não encontrada' });
+      }
+
+      const upstream = await fetch(url, {
+        headers: ARTIC_HEADERS,
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!upstream.ok) {
+        console.error('Museu recusou a imagem do lote', id.data, upstream.status);
+        return res.status(502).json({ error: 'Imagem indisponível no momento' });
+      }
+
+      img = {
+        type: upstream.headers.get('content-type') || 'image/jpeg',
+        body: Buffer.from(await upstream.arrayBuffer()),
+      };
+      if (imageCache.size >= IMAGE_CACHE_MAX) imageCache.delete(imageCache.keys().next().value);
+      imageCache.set(id.data, img);
+    }
+
+    res.set('Content-Type', img.type);
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.send(img.body);
+  } catch (err) {
+    console.error('Erro ao buscar imagem do lote:', err.message);
+    res.status(502).json({ error: 'Imagem indisponível no momento' });
   }
 });
 
