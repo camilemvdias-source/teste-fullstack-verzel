@@ -1,0 +1,47 @@
+# Sobe tudo com:  docker compose up --build
+#   Front-end: http://localhost:5173
+#   API:       http://localhost:3000/health
+# O backend roda a migração e o seed (contas de teste) sozinho ao subir.
+# Os lotes de demonstração são opcionais: veja o README (seed-demo).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: leilao
+      POSTGRES_PASSWORD: leilao
+      POSTGRES_DB: leilao
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leilao -d leilao"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgres://leilao:leilao@db:5432/leilao
+      DATABASE_SSL: "false"
+      PORT: "3000"
+      JWT_SECRET: troque-este-segredo-no-docker
+      PUBLIC_CODE_SECRET: troque-este-outro-segredo-no-docker
+      FRONTEND_URL: http://localhost:5173
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:3000
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

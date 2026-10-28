@@ -26,7 +26,12 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const data = await api('/auth/login', { method: 'POST', body: { email, password }, auth: false });
     setToken(data.token);
-    setUser(data.user);
+    // /me traz também o saldo e o código público (usado para marcar "Você" no histórico)
+    try {
+      setUser(await api('/me'));
+    } catch {
+      setUser(data.user);
+    }
     return data.user;
   }, []);
 

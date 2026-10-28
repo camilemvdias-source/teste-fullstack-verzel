@@ -7,7 +7,8 @@ const router = Router();
 
 const idSchema = z.coerce.number().int().positive();
 
-// Cancela um lote. Só o leiloeiro dono, e só se ainda não houve lances.
+// Cancela um lote. Só o leiloeiro dono, e só antes de encerrar.
+// Se já houve lances, o valor comprometido do líder é devolvido (estorno) na mesma transação.
 router.post('/:id/cancel', requireAuth, requireRole('auctioneer'), async (req, res) => {
   const id = idSchema.safeParse(req.params.id);
   if (!id.success) {
@@ -30,7 +31,7 @@ router.post('/:id/cancel', requireAuth, requireRole('auctioneer'), async (req, r
     // dar um lance neste lote (e vice-versa). Sem isso, um lance poderia
     // entrar no mesmo instante e o lote seria cancelado COM lance.
     const result = await client.query(
-      `SELECT id, auctioneer_id, status, bid_count, (now() >= ends_at) AS time_over
+      `SELECT id, auctioneer_id, status, bid_count, current_bid, current_leader_id, (now() >= ends_at) AS time_over
        FROM lots WHERE id = $1 FOR UPDATE`,
       [id.data]
     );
@@ -48,14 +49,23 @@ router.post('/:id/cancel', requireAuth, requireRole('auctioneer'), async (req, r
     if (lot.status === 'ended' || lot.time_over) {
       return await refuse(409, 'Este lote já foi encerrado');
     }
-    if (lot.bid_count > 0) {
-      return await refuse(409, 'Um lote que já recebeu lances não pode ser cancelado');
+
+    // Estorno: só o líder atual tem dinheiro comprometido (os anteriores já foram liberados)
+    let refunded = 0;
+    if (lot.current_leader_id != null && lot.current_bid != null) {
+      refunded = Number(lot.current_bid);
+      // Trava a carteira do líder para não competir com outra operação dele
+      await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [lot.current_leader_id]);
+      await client.query(
+        'UPDATE users SET balance_committed = balance_committed - $1 WHERE id = $2',
+        [refunded, lot.current_leader_id]
+      );
     }
 
     await client.query(`UPDATE lots SET status = 'cancelled' WHERE id = $1`, [lot.id]);
     await client.query('COMMIT');
 
-    res.json({ id: lot.id, status: 'cancelled' });
+    res.json({ id: lot.id, status: 'cancelled', refunded });
   } catch (err) {
     if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Erro ao cancelar lote:', err.code, err.message);

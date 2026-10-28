@@ -47,7 +47,7 @@ router.get('/', requireAuth, requireRole('auctioneer'), async (req, res) => {
         currentBid: row.current_bid == null ? null : Number(row.current_bid),
         bidCount: row.bid_count,
         // O botão "cancelar" só aparece quando ainda é possível
-        canCancel: status !== 'cancelled' && status !== 'ended' && row.bid_count === 0,
+        canCancel: status !== 'cancelled' && status !== 'ended',
         // Resultado só faz sentido para lote encerrado
         result:
           status === 'ended'

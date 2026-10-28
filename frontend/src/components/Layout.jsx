@@ -1,10 +1,19 @@
+import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { HeartIcon, UserIcon, HomeIcon, GavelIcon } from './Icons.jsx';
+import { HeartIcon, UserIcon, HomeIcon, GavelIcon, MoonIcon, SunIcon } from './Icons.jsx';
+import { currentTheme, setTheme } from '../lib/theme.js';
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [theme, setThemeState] = useState(currentTheme);
+
+  function toggleTheme() {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    setThemeState(next);
+  }
 
   function handleLogout() {
     logout();
@@ -30,6 +39,9 @@ export default function Layout() {
           </nav>
 
           <div className="header-user">
+            <button type="button" className="theme-btn" onClick={toggleTheme} aria-label="Alternar tema claro/escuro">
+              {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+            </button>
             {user ? (
               <>
                 <span className="user-name">{user.name}</span>

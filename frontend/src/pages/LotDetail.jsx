@@ -30,8 +30,11 @@ function describe(lot) {
 export default function LotDetail() {
   const { id } = useParams();
   const { user, refreshUser } = useAuth();
+  const role = user?.role;
   const [lot, setLot] = useState(null);
   const [others, setOthers] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [position, setPosition] = useState(null); // winning | outbid | won | lost | settling
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState('');
 
@@ -49,12 +52,27 @@ export default function LotDetail() {
       if (err instanceof ApiError && err.status === 404) setNotFound(true);
       else setLoadError(err.message);
     }
-  }, [id]);
+
+    // Histórico público e posição do usuário. Se falharem, a tela continua funcionando.
+    try {
+      const audit = await api(`/audit/${id}`, { auth: false });
+      setHistory([...audit.bids].reverse());
+    } catch { /* mantém o histórico anterior */ }
+
+    if (role === 'bidder') {
+      try {
+        const mine = await api('/me/bids');
+        setPosition(mine.items.find((i) => String(i.lotId) === String(id))?.position ?? null);
+      } catch { /* mantém a posição anterior */ }
+    } else {
+      setPosition(null);
+    }
+  }, [id, role]);
 
   useEffect(() => {
     load();
-    // Lance novo de outra pessoa aparece em poucos segundos
-    const t = setInterval(load, 3000);
+    // Lance novo de outra pessoa aparece em poucos segundos (polling de 2s)
+    const t = setInterval(load, 2000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -123,6 +141,11 @@ export default function LotDetail() {
             <StatusBadge status={lot.status} />
             {a.placeOfOrigin && <span className="tag">{a.placeOfOrigin}</span>}
           </div>
+
+          {position === 'winning' && <div className="status-flag winning" role="status">✔ Você está ganhando este lote</div>}
+          {position === 'outbid' && <div className="status-flag outbid" role="status">✘ Você foi superado. Dê um novo lance para voltar à disputa.</div>}
+          {position === 'won' && <div className="status-flag won" role="status">★ Você arrematou este lote. Veja o comprovante em Meus lances.</div>}
+          {position === 'lost' && <p className="muted small">Você deu lances neste lote, mas outro licitante arrematou.</p>}
 
           <div className="price-box">
             <div>
@@ -199,6 +222,31 @@ export default function LotDetail() {
           </span>
         </div>
       </div>
+
+      <section className="about">
+        <h2>Histórico de lances</h2>
+        {history.length === 0 && <p className="muted">Nenhum lance até agora. Seja o primeiro.</p>}
+        {history.length > 0 && (
+          <div className="history-wrap">
+            <table className="table history-table">
+              <thead><tr><th>#</th><th>Licitante</th><th className="num">Valor</th><th>Data</th></tr></thead>
+              <tbody>
+                {history.map((b) => {
+                  const mine = user?.publicCode && b.bidderCode === user.publicCode;
+                  return (
+                    <tr key={b.seq} className={mine ? 'you' : ''}>
+                      <td>{b.seq}</td>
+                      <td>{mine ? 'Você' : `Licitante #${b.bidderCode}`}</td>
+                      <td className="num">{brl(b.amount)}</td>
+                      <td>{formatDateTime(b.createdAt)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="about">
         <h2>Sobre a obra</h2>

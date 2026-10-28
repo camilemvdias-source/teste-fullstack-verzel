@@ -1,4 +1,4 @@
-# Casa de Leilões
+# Aurelia · Leilões de Arte
 
 Teste técnico Full Stack Elite Dev da Verzel: plataforma de leilões online com dois papéis (leiloeiro e licitante).
 
@@ -32,8 +32,8 @@ Também é possível criar contas novas pela tela de cadastro.
 
 | Rota | Quem acessa | O que faz |
 |---|---|---|
-| `/` | público | Vitrine: lotes ao vivo, agendados e encerrados |
-| `/lotes/:id` | público | Detalhe do lote, contagem regressiva e lances (licitante) |
+| `/` | público | Início: destaques, busca e lotes em leilão, agendados e encerrados |
+| `/lotes/:id` | público | Sala do lote: lance atual, histórico de lances, contagem regressiva, selo "você está ganhando / foi superado" e lances (licitante). Atualiza a cada 2 s |
 | `/login` | público | Entrar e cadastrar |
 | `/carteira` | logado | Saldo, depósito (licitante) e extrato |
 | `/meus-lances` | licitante | Situação de cada lance e lotes arrematados |
@@ -210,3 +210,59 @@ Para apontar para outra API, defina `API_URL` (por exemplo, a do Render).
 - **Front-end (Vercel):** pasta raiz `frontend`, variável `VITE_API_URL` com o endereço da API no Render (sem barra no final). O `vercel.json` já redireciona todas as rotas para o `index.html`.
 - **Back-end (Render):** pasta raiz `backend`, comando de início `npm start`, variáveis `DATABASE_URL`, `JWT_SECRET`, `PUBLIC_CODE_SECRET` e `FRONTEND_URL` (endereço da Vercel).
 - **Banco (Neon):** rode `npm run migrate` e `npm run seed` uma vez apontando para o banco de produção.
+
+## Lotes de demonstração (seed com lances)
+
+Depois de `npm run seed` (cria as 3 contas), rode com a API no ar:
+
+```bash
+cd backend
+node scripts/seed-demo.js                                  # API local
+API_URL=https://teste-fullstack-verzel.onrender.com node scripts/seed-demo.js   # API publicada
+```
+
+Cria 6 lotes de obras do Art Institute of Chicago: 4 ao vivo (3 já com lances dos dois licitantes, terminando em 4 a 7 dias) e 2 agendados. Para apagar tudo e recomeçar, use `node scripts/clear-lots.js --confirm`.
+
+## Rodar com Docker
+
+Precisa do Docker Desktop. Na raiz do projeto:
+
+```bash
+docker compose up --build
+```
+
+- Front-end: http://localhost:5173
+- API: http://localhost:3000/health
+
+O Compose sobe o PostgreSQL, a API e o front. O back-end aplica o schema e cria as contas de teste sozinho na subida. Para criar os lotes de demonstração, em outro terminal: `cd backend && node scripts/seed-demo.js` (precisa de Node 20 e `npm install`). Para zerar o banco do Docker: `docker compose down -v`.
+
+## Cancelamento com estorno
+
+O leiloeiro pode cancelar um lote **antes de ele encerrar**, mesmo com lances. Na mesma transação (com o lote travado por `FOR UPDATE`), o valor comprometido do líder volta ao saldo disponível dele e o lote passa a `cancelled`. Lotes cancelados somem da vitrine, da auditoria pública e da lista de lances do licitante, e a liquidação não os processa. Lotes já encerrados não podem ser cancelados.
+
+## Tema claro e escuro
+
+As cores são variáveis CSS. O botão no cabeçalho alterna entre claro e escuro, a escolha fica no `localStorage` e, se a pessoa nunca escolheu, vale a preferência do sistema.
+
+## Comportamentos inesperados e limitações conhecidas
+
+- **API gratuita "dormindo":** a API no Render pode levar cerca de 50 s para responder à primeira requisição.
+- **Imagens das obras:** o museu bloqueia o carregamento direto pelo navegador, então a imagem passa pela nossa API (`GET /lots/:id/image`). Se a imagem não puder ser carregada, a tela mostra um aviso, mas o lote continua funcionando (os dados da obra são copiados para o nosso banco).
+- **Prorrogação:** um lance nos últimos 2 minutos empurra o fim em +2 minutos, então o horário de término pode mudar enquanto a pessoa está na sala do lote.
+- **Liquidação:** o job roda a cada 5 s. Entre o fim do lote e a liquidação, o licitante pode ver o estado "liquidando" por alguns segundos.
+- **Estorno no cancelamento:** devolve só o valor comprometido do líder. Não há movimentação no extrato para o estorno, porque o saldo total não muda.
+- **Auditoria:** detecta alterações parciais, mas não um refazimento completo da cadeia por quem tem acesso total ao banco (veja "Limite assumido" acima).
+- **Atualização:** o front usa polling (a cada 2 s na sala do lote, 10 s na vitrine), não WebSocket/SSE.
+- **Fora do escopo (conforme o enunciado):** nota fiscal, revenda entre usuários, app nativo e recuperação de senha.
+
+## Uso de IA
+
+Veja o arquivo [AI_USAGE.md](./AI_USAGE.md), com onde a IA foi usada, o que foi revisado e o que foi ajustado.
+
+## Limpar os lotes de teste
+
+```bash
+cd backend
+node scripts/clear-lots.js            # simulação (não altera nada)
+node scripts/clear-lots.js --confirm  # apaga lotes, lances, comprovantes e recalcula saldos
+```
