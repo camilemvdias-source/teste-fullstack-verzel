@@ -7,6 +7,9 @@ import meRoutes from './routes/me.js';
 import externalRoutes from './routes/external.js';
 import lotsRoutes from './routes/lots.js';
 import lotActionsRoutes from './routes/lotActions.js';
+import bidsRoutes from './routes/bids.js';
+import walletRoutes from './routes/wallet.js';
+import { settleExpiredLots } from './services/settlement.js';
 
 const app = express();
 
@@ -24,6 +27,8 @@ app.use('/me', meRoutes);
 app.use('/external', externalRoutes);
 app.use('/lots', lotsRoutes);
 app.use('/lots', lotActionsRoutes);
+app.use('/lots', bidsRoutes);
+app.use('/wallet', walletRoutes);
 
 app.get('/health', async (req, res) => {
   try {
@@ -44,7 +49,26 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Erro interno' });
 });
 
+// Job de liquidação: a cada 5 segundos fecha os lotes que já terminaram.
+// "running" impede duas rodadas ao mesmo tempo se uma demorar mais que 5s.
+const SETTLEMENT_INTERVAL_MS = 5000;
+let running = false;
+
+async function runSettlement() {
+  if (running) return;
+  running = true;
+  try {
+    await settleExpiredLots();
+  } catch (err) {
+    console.error('Erro no job de liquidação:', err.message);
+  } finally {
+    running = false;
+  }
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`API rodando na porta ${PORT}`);
+  runSettlement();
+  setInterval(runSettlement, SETTLEMENT_INTERVAL_MS);
 });
