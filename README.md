@@ -103,6 +103,81 @@ Consulte `frontend/.env.example`.
 |---|---|
 | `VITE_API_URL` | Endereço da API |
 
-## Uso de IA
+## Saldo, lances e liquidação
 
-Consulte o arquivo [AI_USAGE.md](AI_USAGE.md).
+- Valores sempre em **centavos inteiros** (100000 = R$ 1.000,00), sem decimais, para evitar erro de arredondamento.
+- **Saldo disponível = total − comprometido.** Ao dar um lance, o valor fica *comprometido*. Quando alguém cobre o lance, o valor do líder anterior volta ao disponível.
+- Cada lance roda em **uma transação** com `SELECT ... FOR UPDATE` no lote: dois lances simultâneos entram em fila e o segundo já enxerga o lance novo.
+- **Anti-sniping:** lance nos últimos 2 minutos empurra o fim do lote em +2 minutos.
+- **Liquidação:** um job roda a cada 5 segundos, fecha os lotes vencidos, debita o vencedor, credita o leiloeiro, grava o extrato e gera o comprovante. É idempotente (trava o lote e só liquida quem ainda está `live`/`scheduled`). Lote sem lances fecha sem vencedor.
+
+## Auditoria à prova de adulteração (hash encadeado)
+
+Cada lance guarda um selo calculado com SHA-256 (a mesma ideia de uma mini blockchain):
+
+```
+hash = SHA256( lot_id | seq | código_público_do_licitante | valor | created_at | prev_hash )
+```
+
+O primeiro lance usa 64 zeros como `prev_hash`. A rota pública `GET /audit/:lotId` recalcula a cadeia inteira e compara com o que está no banco. Ela responde `{ intact, brokenAt }` e indica o lance onde a conta deixou de bater.
+
+| Adulteração | Como é detectada |
+|---|---|
+| Valor, data ou licitante de um lance alterado | o hash recalculado é diferente do gravado |
+| Lance apagado do meio | buraco na sequência (`seq`) e vínculo `prev_hash` quebrado |
+| Lance inserido depois | `bid_count` e `last_hash` do lote não conferem |
+| Último lance apagado | `bid_count` e `last_hash` do lote não conferem |
+| `last_hash` do lote ou `final_hash` do comprovante alterado | não bate com o fim da cadeia recalculada |
+
+### Privacidade
+
+O licitante aparece como **"Licitante #A3F9C1D2"**: o código são os 8 primeiros caracteres de `HMAC-SHA256(PUBLIC_CODE_SECRET, user_id)`. Nome e e-mail nunca aparecem na auditoria nem no comprovante.
+
+### Rotas públicas (sem login)
+
+- `GET /audit/:lotId`: histórico completo e resultado da verificação.
+- `GET /receipts/:publicToken`: lote, valor final, código do vencedor, data e hash final.
+
+Autenticadas: `GET /me/bids` e `GET /me/wins` (licitante) e `GET /my-lots` (leiloeiro).
+
+### Limite assumido
+
+O hash **detecta alterações parciais**, mas não impede um ataque total: quem tem acesso completo ao banco poderia, em teoria, refazer a cadeia inteira e ainda atualizar `last_hash` e o comprovante, tudo junto, e a auditoria ficaria "íntegra". Isso acontece porque o SHA-256 usado não tem chave secreta. Como melhoria, o hash final poderia ser publicado em um lugar externo ao banco (por exemplo, no próprio comprovante compartilhado com o vencedor, ou em um serviço de registro de terceiros), de modo que uma cópia fora do banco denunciaria a troca. Esse cenário está documentado no teste automatizado `LIMITE ASSUMIDO`.
+
+### Teste de adulteração
+
+Rode estes comandos no SQL Editor do Neon (ou `psql`). Use um lote com lances, trocando `N` pelo id do lote, e confira em `GET /audit/N` depois de cada passo. Antes, guarde uma cópia dos lances para poder desfazer:
+
+```sql
+CREATE TABLE bids_backup AS SELECT * FROM bids WHERE lot_id = N;
+```
+
+| Cenário | SQL | Resultado esperado | Como desfazer |
+|---|---|---|---|
+| Valor alterado | `UPDATE bids SET amount = 1 WHERE lot_id = N AND seq = 2;` | `intact: false`, `brokenAt: 2` | `UPDATE bids b SET amount = k.amount FROM bids_backup k WHERE b.id = k.id;` |
+| Lance do meio apagado | `DELETE FROM bids WHERE lot_id = N AND seq = 2;` | `intact: false`, `brokenAt: 2` | `INSERT INTO bids SELECT * FROM bids_backup WHERE seq = 2;` |
+| Último lance apagado | `DELETE FROM bids WHERE lot_id = N AND seq = (SELECT bid_count FROM lots WHERE id = N);` | `intact: false` (lances faltando no final) | `INSERT INTO bids SELECT * FROM bids_backup k WHERE NOT EXISTS (SELECT 1 FROM bids b WHERE b.id = k.id);` |
+| Lance falso inserido | `INSERT INTO bids (lot_id, bidder_id, amount, seq, prev_hash, hash) SELECT lot_id, bidder_id, amount + 10000, seq + 1, hash, repeat('a', 64) FROM bids WHERE lot_id = N ORDER BY seq DESC LIMIT 1;` | `intact: false`, aponta o lance novo | `DELETE FROM bids WHERE lot_id = N AND seq > (SELECT bid_count FROM lots WHERE id = N);` |
+| Comprovante alterado | `UPDATE receipts SET final_hash = repeat('a', 64) WHERE lot_id = N;` | `intact: false` | `UPDATE receipts SET final_hash = (SELECT last_hash FROM lots WHERE id = N) WHERE lot_id = N;` |
+
+Ao terminar: `DROP TABLE bids_backup;`
+
+## Como rodar os testes
+
+```bash
+cd backend
+npm test
+```
+
+Roda os testes da auditoria (hash encadeado e detecção de adulteração), que não precisam de banco.
+
+Teste ponta a ponta contra a API em execução (precisa de internet, banco com o seed rodado e a API no ar):
+
+```bash
+npm run e2e -- start            # cria um lote ao vivo e testa lances, saldo e auditoria
+# encerre o lote: UPDATE lots SET ends_at = now() - interval '1 second' WHERE id = <id>;
+npm run e2e -- check <id>       # testa liquidação, comprovante e extratos
+```
+
+Para apontar para outra API, defina `API_URL` (por exemplo, a do Render).
+
