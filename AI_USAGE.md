@@ -1,0 +1,5 @@
+# Uso de IA neste projeto
+
+Utilizei inteligência artificial como ferramenta de apoio ao desenvolvimento, à revisão técnica e à documentação do projeto. Com esse apoio, reformulei a identidade visual do front-end a partir de uma referência que defini, completei a sala do lote com histórico de lances, selo “você está ganhando / foi superado” e atualização a cada 2 segundos, implementei o cancelamento de lote com estorno automático em transação, e preparei os scripts de limpeza e de dados de demonstração, o Docker Compose e o README. Revisei as alterações, testei o fluxo de lances, saldo e auditoria e ajustei o que não funcionou como esperado. A definição dos requisitos, as decisões de arquitetura e a validação dos resultados permaneceram sob minha responsabilidade.
+
+Na revisão final, usei IA para auditar o código contra o enunciado e implementar o HMAC-SHA256 na cadeia de auditoria, com testes de adulteração e script de migração. Os 19 testes de auditoria foram executados; os fluxos que dependem de banco (lances, carteira, liquidação) e o build do front-end não puderam ser executados nesse ambiente e precisam ser validados por mim.
