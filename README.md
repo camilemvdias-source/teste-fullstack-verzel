@@ -67,14 +67,26 @@ Crie o arquivo `.env` a partir do `.env.example`. No PowerShell, use:
 Copy-Item .env.example .env
 ```
 
-Configure as variáveis de ambiente no arquivo `.env` e execute:
+Preencha o `backend/.env` (detalhes de cada variável em [Variáveis de ambiente](#variáveis-de-ambiente)):
+
+- `DATABASE_URL`: string de conexão do PostgreSQL. Em um Postgres local sem SSL, acrescente também `DATABASE_SSL=false`.
+- `JWT_SECRET`, `PUBLIC_CODE_SECRET` e `AUDIT_SECRET`: textos longos e secretos. Para gerar um valor aleatório:
 
 ```bash
-npm run migrate
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+- `FRONTEND_URL`: `http://localhost:5173`.
+
+Depois crie as tabelas, as contas de teste e suba a API:
+
+```bash
+npm run migrate    # cria as tabelas (pode rodar mais de uma vez)
+npm run seed       # cria o leiloeiro e os dois licitantes de teste
 npm run dev
 ```
 
-A API ficará disponível em `http://localhost:3000`.
+A API ficará disponível em `http://localhost:3000` (confira em `http://localhost:3000/health`). Para ter lotes com lances já abertos, veja [Lotes de demonstração](#lotes-de-demonstração-seed-com-lances).
 
 ### 2. Front-end
 
@@ -114,6 +126,7 @@ Consulte `backend/.env.example`.
 | Variável | Finalidade |
 |---|---|
 | `DATABASE_URL` | String de conexão do PostgreSQL |
+| `DATABASE_SSL` | Opcional. Use `false` em Postgres local sem SSL (o Docker já define). Por padrão a conexão usa SSL, como no Neon |
 | `PORT` | Porta da API (padrão: 3000) |
 | `JWT_SECRET` | Segredo usado para assinar tokens de autenticação |
 | `PUBLIC_CODE_SECRET` | Segredo usado para gerar códigos públicos dos licitantes |
@@ -223,7 +236,8 @@ Depois de `npm run seed` (cria as 3 contas), rode com a API no ar:
 ```bash
 cd backend
 node scripts/seed-demo.js                                  # API local
-API_URL=https://teste-fullstack-verzel.onrender.com node scripts/seed-demo.js   # API publicada
+API_URL=https://teste-fullstack-verzel.onrender.com node scripts/seed-demo.js   # API publicada (Linux/macOS)
+$env:API_URL="https://teste-fullstack-verzel.onrender.com"; node scripts/seed-demo.js   # API publicada (PowerShell)
 ```
 
 Cria 6 lotes de obras do Art Institute of Chicago: 4 ao vivo (3 já com lances dos dois licitantes, terminando em 4 a 7 dias) e 2 agendados. Para apagar tudo e recomeçar, use `node scripts/clear-lots.js --confirm`.
