@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import LotCard from '../components/LotCard.jsx';
 import ArtImage from '../components/ArtImage.jsx';
-import { ArrowIcon, SearchIcon } from '../components/Icons.jsx';
+import { ArrowIcon, HeartIcon, SearchIcon } from '../components/Icons.jsx';
+import { useFavorites } from '../hooks/useFavorites.js';
 
 const TABS = [
   { key: 'live', label: 'Em leilão', empty: 'Nenhum leilão ao vivo agora.' },
@@ -17,6 +18,8 @@ export default function Home() {
   const [featured, setFeatured] = useState([]);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
+  const [onlyFavs, setOnlyFavs] = useState(false);
+  const { ids: favIds } = useFavorites();
 
   const load = useCallback(async () => {
     try {
@@ -46,8 +49,11 @@ export default function Home() {
   const hero = featured[0];
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q ? items?.filter((l) => l.title.toLowerCase().includes(q)) : items;
-  }, [items, query]);
+    let list = items;
+    if (q) list = list?.filter((l) => l.title.toLowerCase().includes(q));
+    if (onlyFavs) list = list?.filter((l) => favIds.includes(l.id));
+    return list;
+  }, [items, query, onlyFavs, favIds]);
 
   return (
     <>
@@ -82,10 +88,15 @@ export default function Home() {
             <h2>Todas as obras</h2>
             {filtered && <small className="muted">{filtered.length} {filtered.length === 1 ? 'resultado' : 'resultados'}</small>}
           </div>
-          <label className="search">
-            <SearchIcon width={18} height={18} />
-            <input type="search" placeholder="Buscar obra pelo título" value={query} onChange={(e) => setQuery(e.target.value)} />
-          </label>
+          <div className="section-tools">
+            <button type="button" className="chip" aria-pressed={onlyFavs} onClick={() => setOnlyFavs((v) => !v)}>
+              <HeartIcon width={16} height={16} /> Favoritos
+            </button>
+            <label className="search">
+              <SearchIcon width={18} height={18} />
+              <input type="search" placeholder="Buscar obra pelo título" value={query} onChange={(e) => setQuery(e.target.value)} />
+            </label>
+          </div>
         </div>
 
         <div className="tabs" role="tablist">
@@ -98,7 +109,7 @@ export default function Home() {
 
         {error && <div className="alert alert-error" role="alert">{error}</div>}
         {items === null && !error && <p className="center muted">Carregando…</p>}
-        {filtered?.length === 0 && <p className="center muted">{query ? 'Nenhuma obra encontrada para a busca.' : current.empty}</p>}
+        {filtered?.length === 0 && <p className="center muted">{onlyFavs ? 'Você ainda não favoritou obras nesta aba. Toque no coração de uma obra para salvá-la.' : query ? 'Nenhuma obra encontrada para a busca.' : current.empty}</p>}
         {filtered?.length > 0 && (
           <div className="lot-grid">
             {filtered.map((lot) => <LotCard key={lot.id} lot={lot} />)}

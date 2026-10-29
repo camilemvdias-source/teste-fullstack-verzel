@@ -13,13 +13,15 @@ const DAY = 24 * 60 * 60 * 1000;
 const iso = (ms) => new Date(Date.now() + ms).toISOString();
 
 // Valores em centavos. externalId = id da obra no Art Institute of Chicago.
+// Prazos contados a partir do momento em que o script roda: 4 lotes ao vivo
+// terminando em 10, 9, 8 e 7 dias, e 2 agendados que começam em 2 e 3 dias.
 const LOTS = [
-  { externalId: 27992, startingBid: 150000, minIncrement: 10000, startsAt: iso(-60_000), endsAt: iso(7 * DAY), bids: [['b1', 150000], ['b2', 160000], ['b1', 180000]] },
-  { externalId: 16568, startingBid: 120000, minIncrement: 5000, startsAt: iso(-60_000), endsAt: iso(5 * DAY), bids: [['b2', 120000]] },
-  { externalId: 28560, startingBid: 90000, minIncrement: 5000, startsAt: iso(-60_000), endsAt: iso(6 * DAY), bids: [] },
-  { externalId: 111628, startingBid: 200000, minIncrement: 10000, startsAt: iso(-60_000), endsAt: iso(4 * DAY), bids: [['b1', 200000], ['b2', 210000]] },
-  { externalId: 20684, startingBid: 80000, minIncrement: 5000, startsAt: iso(2 * DAY), endsAt: iso(9 * DAY), bids: [] },
-  { externalId: 6565, startingBid: 100000, minIncrement: 5000, startsAt: iso(3 * DAY), endsAt: iso(10 * DAY), bids: [] },
+  { externalId: 27992, startingBid: 150000, minIncrement: 10000, startsAt: iso(-60_000), endsAt: iso(10 * DAY), bids: [['b1', 150000], ['b2', 160000], ['b1', 180000]] },
+  { externalId: 16568, startingBid: 120000, minIncrement: 5000, startsAt: iso(-60_000), endsAt: iso(9 * DAY), bids: [['b2', 120000]] },
+  { externalId: 28560, startingBid: 90000, minIncrement: 5000, startsAt: iso(-60_000), endsAt: iso(8 * DAY), bids: [] },
+  { externalId: 111628, startingBid: 200000, minIncrement: 10000, startsAt: iso(-60_000), endsAt: iso(7 * DAY), bids: [['b1', 200000], ['b2', 210000]] },
+  { externalId: 20684, startingBid: 80000, minIncrement: 5000, startsAt: iso(2 * DAY), endsAt: iso(12 * DAY), bids: [] },
+  { externalId: 6565, startingBid: 100000, minIncrement: 5000, startsAt: iso(3 * DAY), endsAt: iso(13 * DAY), bids: [] },
 ];
 
 async function api(method, path, { token, body } = {}) {

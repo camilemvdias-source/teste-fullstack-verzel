@@ -4,7 +4,8 @@ import { api, ApiError } from '../api/client.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import ArtImage from '../components/ArtImage.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
-import { BackIcon, ShieldIcon, PinIcon, ClockIcon, ArrowIcon } from '../components/Icons.jsx';
+import { BackIcon, ShieldIcon, PinIcon, ClockIcon, ArrowIcon, HeartIcon } from '../components/Icons.jsx';
+import { useFavorites } from '../hooks/useFavorites.js';
 import { useCountdown } from '../hooks/useCountdown.js';
 import { brl, formatDateTime, parseBrlToCents } from '../lib/format.js';
 
@@ -31,6 +32,7 @@ export default function LotDetail() {
   const { id } = useParams();
   const { user, refreshUser } = useAuth();
   const role = user?.role;
+  const { isFav, toggle: toggleFav } = useFavorites();
   const [lot, setLot] = useState(null);
   const [others, setOthers] = useState([]);
   const [history, setHistory] = useState([]);
@@ -140,6 +142,9 @@ export default function LotDetail() {
           <div className="tags">
             <StatusBadge status={lot.status} />
             {a.placeOfOrigin && <span className="tag">{a.placeOfOrigin}</span>}
+            <button type="button" className={`fav-btn ${isFav(lot.id) ? 'on' : ''}`} aria-pressed={isFav(lot.id)} onClick={() => toggleFav(lot.id)}>
+              <HeartIcon width={14} height={14} /> {isFav(lot.id) ? 'Favoritado' : 'Favoritar'}
+            </button>
           </div>
 
           {position === 'winning' && <div className="status-flag winning" role="status">✔ Você está ganhando este lote</div>}
