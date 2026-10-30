@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { HeartIcon, UserIcon, HomeIcon, GavelIcon, MoonIcon, SunIcon } from './Icons.jsx';
+import { UserIcon, HomeIcon, GavelIcon, MoonIcon, SunIcon, WalletIcon } from './Icons.jsx';
 import { currentTheme, setTheme } from '../lib/theme.js';
+import { brl } from '../lib/format.js';
+import Logo from './Logo.jsx';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -21,16 +23,16 @@ export default function Layout() {
   }
 
   const roleLink = user?.role === 'bidder'
-    ? { to: '/meus-lances', label: 'Meus lances' }
+    ? { to: '/meus-lances', label: 'Meus lances', short: 'Lances' }
     : user?.role === 'auctioneer'
-      ? { to: '/meus-lotes', label: 'Meus lotes' }
+      ? { to: '/meus-lotes', label: 'Meus lotes', short: 'Lotes' }
       : null;
 
   return (
     <>
       <header className="header">
         <div className="header-inner">
-          <Link to="/" className="brand">Aurelia</Link>
+          <Link to="/" className="brand" aria-label="Aurelia, página inicial"><Logo /></Link>
 
           <nav className="nav" aria-label="Principal">
             <NavLink to="/" end>Leilões</NavLink>
@@ -39,20 +41,19 @@ export default function Layout() {
           </nav>
 
           <div className="header-user">
-            <button type="button" className="theme-btn" onClick={toggleTheme} aria-label="Alternar tema claro/escuro">
+            {user?.role === 'bidder' && user.balance && (
+              <Link to="/carteira" className="balance-link" title="Saldo disponível">{brl(user.balance.available)}</Link>
+            )}
+            <button type="button" className="theme-btn" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}>
               {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
             </button>
             {user ? (
               <>
                 <span className="user-name">{user.name}</span>
-                <NavLink to="/carteira" className="icon-btn" aria-label="Minha conta"><UserIcon /></NavLink>
-                <button className="btn btn-dark" onClick={handleLogout}>Sair</button>
+                <button className="btn btn-sm" onClick={handleLogout}>Sair</button>
               </>
             ) : (
-              <>
-                <Link to="/login" className="icon-btn" aria-label="Entrar"><UserIcon /></Link>
-                <Link to="/login" className="btn btn-dark">Entrar</Link>
-              </>
+              <Link to="/login" className="btn btn-dark btn-sm">Entrar</Link>
             )}
           </div>
         </div>
@@ -62,18 +63,36 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      <footer className="footer">
-        <span className="brand-small">Aurelia · Leilões de Arte</span>
-        <span className="quote">Arte é mais do que se vê. É o que se sente.</span>
+      <footer className="site-footer">
+        <div className="footer-inner">
+          <div className="footer-brand">
+            <Logo />
+          </div>
+          <nav aria-label="Leilões">
+            <h4>Leilões</h4>
+            <Link to="/">Ao vivo</Link>
+            <Link to="/">Próximos leilões</Link>
+            <Link to="/">Resultados</Link>
+          </nav>
+          <nav aria-label="Sua conta">
+            <h4>Sua conta</h4>
+            {user ? <Link to="/carteira">Carteira</Link> : <Link to="/login">Entrar</Link>}
+            {user?.role === 'bidder' && <Link to="/meus-lances">Meus lances e arremates</Link>}
+            {user?.role === 'auctioneer' && <Link to="/meus-lotes">Meus lotes</Link>}
+            {!user && <Link to="/login">Criar conta</Link>}
+          </nav>
+        </div>
+        <div className="footer-legal">
+          <span>© {new Date().getFullYear()} Aurelia Leilões de Arte</span>
+          <span>Imagens: Art Institute of Chicago (CC0)</span>
+        </div>
       </footer>
 
       <nav className="bottom-nav" aria-label="Navegação móvel">
-        <NavLink to="/" end><HomeIcon /><span>Início</span></NavLink>
-        {roleLink
-          ? <NavLink to={roleLink.to}><GavelIcon /><span>{user.role === 'bidder' ? 'Lances' : 'Lotes'}</span></NavLink>
-          : <NavLink to="/" end className="x"><GavelIcon /><span>Leilões</span></NavLink>}
-        {user && <NavLink to="/carteira"><HeartIcon /><span>Carteira</span></NavLink>}
-        <NavLink to={user ? '/carteira' : '/login'}><UserIcon /><span>{user ? 'Perfil' : 'Entrar'}</span></NavLink>
+        <NavLink to="/" end><HomeIcon /><span>Leilões</span></NavLink>
+        {roleLink && <NavLink to={roleLink.to}><GavelIcon /><span>{roleLink.short}</span></NavLink>}
+        {user && <NavLink to="/carteira"><WalletIcon /><span>Carteira</span></NavLink>}
+        {!user && <NavLink to="/login"><UserIcon /><span>Entrar</span></NavLink>}
       </nav>
     </>
   );

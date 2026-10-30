@@ -16,6 +16,7 @@ import receiptsRoutes from './routes/receipts.js';
 import myActivityRoutes from './routes/myActivity.js';
 import myLotsRoutes from './routes/myLots.js';
 import { settleExpiredLots } from './services/settlement.js';
+import { ensureLiveDemoLots } from './services/demo.js';
 
 const app = express();
 
@@ -76,9 +77,24 @@ async function runSettlement() {
   }
 }
 
+// Vitrine viva (opcional, DEMO_KEEPALIVE=true): na subida e a cada hora, abre lotes
+// de demonstração novos se a vitrine ficou com menos de 3 lotes ao vivo.
+async function runKeepAlive() {
+  try {
+    const created = await ensureLiveDemoLots();
+    if (created > 0) console.log(`Vitrine viva: ${created} lote(s) de demonstração aberto(s)`);
+  } catch (err) {
+    console.error('Erro na vitrine viva:', err.message);
+  }
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`API rodando na porta ${PORT}`);
   runSettlement();
   setInterval(runSettlement, SETTLEMENT_INTERVAL_MS);
+  if (process.env.DEMO_KEEPALIVE === 'true') {
+    runKeepAlive();
+    setInterval(runKeepAlive, 60 * 60 * 1000);
+  }
 });

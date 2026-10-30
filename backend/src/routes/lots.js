@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { getArtwork, ExternalApiError, HEADERS as ARTIC_HEADERS } from '../services/artic.js';
+import { getArtwork, ExternalApiError } from '../services/artic.js';
+import { fetchMuseumImage, getArtworkImage } from '../services/images.js';
 
 const router = Router();
 
@@ -54,10 +55,14 @@ function formatLot(row, { detail = false } = {}) {
   const startingBid = Number(row.starting_bid);
   const minIncrement = Number(row.min_increment);
   const currentBid = row.current_bid == null ? null : Number(row.current_bid);
+  const attrs = row.attributes || {};
 
   const lot = {
     id: row.id,
     title: row.title,
+    // Nome curto do artista para a vitrine ("Claude Monet", sem nacionalidade e datas)
+    artist: attrs.artistName || attrs.artist?.split('\n')[0] || null,
+    date: attrs.date ?? null,
     imageUrl: row.image_url,
     status: row.effective_status,
     startingBid,
@@ -67,6 +72,8 @@ function formatLot(row, { detail = false } = {}) {
     bidCount: row.bid_count,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
+    // Resultado de lote encerrado (já é público na auditoria); null enquanto não liquida
+    finalPrice: row.final_price == null ? null : Number(row.final_price),
   };
 
   if (detail) {
@@ -96,7 +103,7 @@ router.post('/', requireAuth, requireRole('auctioneer'), async (req, res) => {
     if (!artwork) {
       return res
         .status(404)
-        .json({ error: 'Obra não encontrada na API do museu (ou sem imagem).' });
+        .json({ error: 'Obra não encontrada na API do museu (ou sem imagem em domínio público).' });
     }
 
     const result = await pool.query(
@@ -116,6 +123,11 @@ router.post('/', requireAuth, requireRole('auctioneer'), async (req, res) => {
         startsAt,
         endsAt,
       ]
+    );
+
+    // Já guarda a imagem no banco; se o museu falhar agora, a primeira visita tenta de novo
+    fetchMuseumImage(artwork.imageUrl).catch((err) =>
+      console.error('Não deu para guardar a imagem do lote agora:', err.message)
     );
 
     res.status(201).json(formatLot(result.rows[0], { detail: true }));
@@ -159,6 +171,7 @@ router.get('/', async (req, res) => {
        ORDER BY
          CASE effective_status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END,
          (CASE WHEN effective_status = 'ended' THEN ends_at END) DESC NULLS LAST,
+         (CASE WHEN effective_status = 'scheduled' THEN starts_at END) ASC NULLS LAST,
          ends_at ASC
        LIMIT 100`,
       params
@@ -196,45 +209,17 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Imagem do lote, servida pela nossa API. O museu bloqueia imagens pedidas direto
-// pelo navegador de outros sites; aqui o servidor busca com os cabeçalhos certos.
+// Imagem do lote, servida pela nossa API a partir da cópia no banco (ver services/images.js).
 // Só aceita a URL já gravada no lote e só do domínio do museu (não é um proxy aberto).
-const imageCache = new Map();
-const IMAGE_CACHE_MAX = 200;
-
 router.get('/:id/image', async (req, res) => {
   const id = idSchema.safeParse(req.params.id);
   if (!id.success) return res.status(400).json({ error: 'Id inválido' });
 
   try {
-    let img = imageCache.get(id.data);
-
-    if (!img) {
-      const result = await pool.query('SELECT image_url FROM lots WHERE id = $1', [id.data]);
-      const url = result.rows[0]?.image_url;
-      if (!url) return res.status(404).json({ error: 'Imagem não encontrada' });
-
-      const host = new URL(url).hostname;
-      if (host !== 'artic.edu' && !host.endsWith('.artic.edu')) {
-        return res.status(404).json({ error: 'Imagem não encontrada' });
-      }
-
-      const upstream = await fetch(url, {
-        headers: ARTIC_HEADERS,
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!upstream.ok) {
-        console.error('Museu recusou a imagem do lote', id.data, upstream.status);
-        return res.status(502).json({ error: 'Imagem indisponível no momento' });
-      }
-
-      img = {
-        type: upstream.headers.get('content-type') || 'image/jpeg',
-        body: Buffer.from(await upstream.arrayBuffer()),
-      };
-      if (imageCache.size >= IMAGE_CACHE_MAX) imageCache.delete(imageCache.keys().next().value);
-      imageCache.set(id.data, img);
-    }
+    const result = await pool.query('SELECT image_url FROM lots WHERE id = $1', [id.data]);
+    const url = result.rows[0]?.image_url;
+    const img = url ? await getArtworkImage(url) : null;
+    if (!img) return res.status(404).json({ error: 'Imagem não encontrada' });
 
     res.set('Content-Type', img.type);
     res.set('Cache-Control', 'public, max-age=86400');

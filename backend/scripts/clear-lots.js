@@ -1,7 +1,8 @@
 // Apaga os lotes cadastrados e tudo que depende deles (lances, comprovantes e
 // movimentações ligadas a lote). Os USUÁRIOS e os depósitos são mantidos.
-// Os saldos são recalculados a partir do extrato restante e o valor
-// comprometido em lances volta a zero.
+// Os saldos são recalculados a partir do extrato restante, e o valor
+// comprometido passa a ser só o dos lances que continuam liderando lotes
+// não liquidados (com --email, os lotes de outros leiloeiros continuam valendo).
 //
 // Uso (dentro de backend):
 //   node scripts/clear-lots.js             -> só mostra o que seria apagado
@@ -42,10 +43,14 @@ try {
     const g = await client.query('DELETE FROM ledger WHERE lot_id = ANY($1::int[])', [ids]);
     await client.query('DELETE FROM lots WHERE id = ANY($1::int[])', [ids]);
 
-    // Saldo = soma do extrato que sobrou; nada fica preso em lance
+    // Saldo = soma do extrato que sobrou; comprometido = lances que ainda lideram
+    // um lote não liquidado (zerar todo mundo quebrava lances e liquidação dos outros lotes)
     await client.query(`
       UPDATE users u SET
-        balance_committed = 0,
+        balance_committed = COALESCE((
+          SELECT SUM(current_bid) FROM lots
+           WHERE current_leader_id = u.id AND status IN ('live', 'scheduled')
+        ), 0),
         balance_total = COALESCE((
           SELECT SUM(CASE WHEN type = 'settlement_debit' THEN -amount ELSE amount END)
             FROM ledger WHERE user_id = u.id

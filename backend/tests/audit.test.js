@@ -141,10 +141,11 @@ test('adulterar só o last_hash do lote é detectado', () => {
   assert.equal(r.code, 'LAST_HASH_MISMATCH');
 });
 
-// Refaz cadeia + last_hash + comprovante com a função de hash que o atacante tiver.
-function rebuildAll(d, hashFn) {
-  let prev = GENESIS_HASH;
-  for (const b of d.bids) {
+// Refaz cadeia + last_hash + comprovante com a função de hash que o atacante tiver
+// (a partir do lance de índice "from"; os anteriores ficam como estão).
+function rebuildAll(d, hashFn, from = 0) {
+  let prev = from === 0 ? GENESIS_HASH : d.bids[from - 1].hash;
+  for (const b of d.bids.slice(from)) {
     b.prev_hash = prev;
     b.hash = hashFn({
       lotId: LOT_ID, seq: b.seq, publicCode: b.public_code,
@@ -219,6 +220,23 @@ test('migração: cadeia antiga é lida com a função antiga e refeita com HMAC
   assert.equal(verifyChain(legacy, plainSha256).intact, true);
   rebuildAll(legacy, computeBidHash);
   assert.equal(verifyChain(legacy).intact, true);
+});
+
+test('migração: lances antigos seguidos de lances já em HMAC (dados antes da migração) são aceitos', () => {
+  const mixed = fresh();
+  rebuildAll(mixed, plainSha256);
+  rebuildAll(mixed, computeBidHash, 1); // lances 2 e 3 entraram depois do deploy do HMAC
+  assert.equal(verifyChain(mixed).intact, false); // o verificador público continua só com HMAC
+  assert.equal(verifyChain(mixed, plainSha256).intact, false); // por isso o script pulava o lote
+  assert.equal(verifyChain(mixed, [plainSha256, computeBidHash]).intact, true);
+});
+
+test('migração: lance no formato antigo DEPOIS de um lance em HMAC não é aceito', () => {
+  const d = fresh();
+  rebuildAll(d, plainSha256, 2); // só o lance 3 "volta" para o formato antigo
+  const r = verifyChain(d, [plainSha256, computeBidHash]);
+  assert.equal(r.intact, false);
+  assert.equal(r.brokenAt, 3);
 });
 
 test('sem AUDIT_SECRET a geração do selo falha em vez de usar chave vazia', () => {

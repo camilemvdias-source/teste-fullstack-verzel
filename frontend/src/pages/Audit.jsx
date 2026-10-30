@@ -23,23 +23,25 @@ export default function Audit() {
 
   if (notFound) return <p className="center muted">Lote não encontrado. <Link to="/">Voltar à vitrine</Link></p>;
   if (error) return <div className="alert alert-error" role="alert">{error}</div>;
-  if (!data) return <p className="center muted">Verificando…</p>;
+  if (!data) return <p className="center muted">Verificando a cadeia de selos…</p>;
 
   const { lot, verification, bids } = data;
 
   return (
     <>
-      <h1>Auditoria · {lot.title}</h1>
-      <p><Link to={`/lotes/${lot.id}`}>Ver lote</Link></p>
+      <p className="crumbs"><Link to={`/lotes/${lot.id}`}>Lote {lot.id}</Link> / Auditoria</p>
+      <h1>Auditoria do lote {lot.id}</h1>
+      <p className="title-art" style={{ fontSize: '1.15rem', marginTop: -4 }}>{lot.title}</p>
 
       {verification.intact ? (
-        <div className="alert alert-success" role="status">
-          ✔ Histórico íntegro: {verification.checkedBids} {verification.checkedBids === 1 ? 'lance verificado' : 'lances verificados'}, a cadeia de selos confere.
+        <div className="verdict ok" role="status">
+          <b>Histórico íntegro</b>
+          {verification.checkedBids} {verification.checkedBids === 1 ? 'lance verificado' : 'lances verificados'}: todos os selos conferem com os dados gravados.
         </div>
       ) : (
-        <div className="alert alert-error" role="alert">
-          ✘ Adulteração detectada{verification.brokenAt ? ` no lance ${verification.brokenAt}` : ''}.
-          {verification.reason ? ` ${verification.reason}` : ''}
+        <div className="verdict bad" role="alert">
+          <b>Adulteração detectada{verification.brokenAt ? ` no lance ${verification.brokenAt}` : ''}</b>
+          {verification.reason}
         </div>
       )}
 
@@ -49,8 +51,9 @@ export default function Audit() {
         <div className="card"><span className="muted">Vencedor</span><strong>{lot.winnerCode ? `#${lot.winnerCode}` : '—'}</strong></div>
       </div>
 
-      <div className="card" style={{ overflowX: 'auto' }}>
-        <h3>Histórico de lances</h3>
+      <div className="card table-wrap">
+        <h2>Histórico de lances</h2>
+        <p className="fine" style={{ marginTop: 0, marginBottom: 12 }}>Cada selo é um HMAC-SHA256 dos dados do lance com o selo anterior. Mudar, apagar ou inserir um lance, mesmo direto no banco, quebra a cadeia a partir dali.</p>
         {bids.length === 0 && <p className="muted">Este lote não recebeu lances.</p>}
         {bids.length > 0 && (
           <table className="table">

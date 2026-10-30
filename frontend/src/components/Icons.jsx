@@ -12,3 +12,5 @@ export const HomeIcon = (p) => <svg {...base} {...p}><path d="m4 11 8-7 8 7v9H4v
 export const GavelIcon = (p) => <svg {...base} {...p}><path d="m14 5 5 5M10 9l5 5M4 20l7-7M12 3l3-1 7 7-1 3-9-9Z" /></svg>;
 export const MoonIcon = (p) => <svg {...base} {...p}><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" /></svg>;
 export const SunIcon = (p) => <svg {...base} {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>;
+export const WalletIcon = (p) => <svg {...base} {...p}><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M16 12.5h2M3 9h18" /></svg>;
+export const PaddleIcon = (p) => <svg {...base} {...p}><circle cx="12" cy="9" r="6" /><path d="M12 15v6" /></svg>;

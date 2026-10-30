@@ -10,6 +10,7 @@
     "start": "node src/server.js",
     "migrate": "node src/db/migrate.js",
     "seed": "node src/db/seed.js",
+    "seed-demo": "node scripts/seed-demo.js",
     "clear-lots": "node scripts/clear-lots.js"
   },
   "keywords": [],

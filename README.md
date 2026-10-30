@@ -42,7 +42,7 @@ Também é possível criar contas novas pela tela de cadastro.
 | `/comprovante/:token` | público | Comprovante de arremate |
 | `/auditoria/:lotId` | público | Histórico de lances e verificação da cadeia de selos |
 
-As imagens das obras passam pela API (`GET /lots/:id/image`), porque o museu bloqueia o carregamento direto pelo navegador.
+As imagens das obras passam pela API (`GET /lots/:id/image`), porque o museu bloqueia o carregamento direto pelo navegador. Na primeira busca a API guarda uma cópia no banco (tabela `artwork_images`): vitrine, sala, auditoria e comprovante continuam com imagem mesmo com a API do museu fora do ar (requisito "Gestão da API externa" do enunciado). A busca do leiloeiro só traz **pinturas em domínio público** (CC0), com miniatura.
 
 ## Como rodar localmente
 
@@ -83,6 +83,7 @@ Depois crie as tabelas, as contas de teste e suba a API:
 ```bash
 npm run migrate    # cria as tabelas (pode rodar mais de uma vez)
 npm run seed       # cria o leiloeiro e os dois licitantes de teste
+npm run seed-demo  # cria os lotes de demonstração (ao vivo com lances, agendados e encerrados)
 npm run dev
 ```
 
@@ -132,6 +133,7 @@ Consulte `backend/.env.example`.
 | `PUBLIC_CODE_SECRET` | Segredo usado para gerar códigos públicos dos licitantes |
 | `AUDIT_SECRET` | Chave (mín. 16 caracteres) do HMAC que sela a cadeia de lances. Obrigatória: a API não sobe sem ela. Nunca no banco nem no Git. Trocar a chave invalida a verificação dos lances já gravados |
 | `FRONTEND_URL` | Endereço do front-end autorizado pelo CORS |
+| `DEMO_KEEPALIVE` | Opcional. `true` abre lotes de demonstração novos quando a vitrine fica com menos de 3 ao vivo |
 
 ### Front-end — `frontend/.env`
 
@@ -184,7 +186,7 @@ A chave `AUDIT_SECRET` fica só no ambiente do servidor. Quem tem acesso **apena
 
 O que continua possível: quem obtiver a chave (acesso ao servidor ou às variáveis do Render) consegue forjar um histórico. A auditoria não é "inviolável". Para reduzir esse risco, seria preciso publicar o selo final fora do sistema (por exemplo, no comprovante do vencedor ou em um registro de terceiros).
 
-**Dados já existentes (migração única):** lotes gravados com o formato antigo precisam ser refeitos com a chave, uma vez, logo após o deploy: `node scripts/reseal-audit.js` (simulação) e `node scripts/reseal-audit.js --confirm`. O script só refaz lotes cuja cadeia antiga esteja íntegra, ignora os já migrados e lista os inconsistentes sem apagar nada. Em bancos de demonstração, é possível alternativamente rodar `clear-lots.js --confirm` e `seed-demo.js`.
+**Dados já existentes (migração única):** lotes gravados com o formato antigo precisam ser refeitos com a chave, uma vez, logo após o deploy: `node scripts/reseal-audit.js` (simulação) e `node scripts/reseal-audit.js --confirm`. O script só refaz lotes cuja cadeia antiga esteja íntegra, ignora os já migrados e lista os inconsistentes sem apagar nada. Também refaz lotes que receberam lances entre o deploy e a migração (começo da cadeia no formato antigo e o resto já em HMAC); sem isso, a auditoria pública desses lotes acusa "adulteração" no primeiro lance antigo. Em bancos de demonstração, é possível alternativamente rodar `clear-lots.js --confirm` e `seed-demo.js`.
 
 ### Teste de adulteração
 
@@ -211,7 +213,9 @@ cd backend
 npm test
 ```
 
-Roda os testes da auditoria (HMAC encadeado e detecção de adulteração, 19 testes), que não precisam de banco. A chave usada nos testes é definida no próprio arquivo de teste.
+Roda os testes da auditoria (HMAC encadeado e detecção de adulteração, 21 testes), que não precisam de banco. A chave usada nos testes é definida no próprio arquivo de teste.
+
+No front-end, `cd frontend && npm test` roda os testes da conversão dos valores digitados (R$ → centavos).
 
 Teste ponta a ponta contra a API em execução (precisa de internet, banco com o seed rodado e a API no ar):
 
@@ -231,16 +235,17 @@ Para apontar para outra API, defina `API_URL` (por exemplo, a do Render).
 
 ## Lotes de demonstração (seed com lances)
 
-Depois de `npm run seed` (cria as 3 contas), rode com a API no ar:
+O enunciado pede um leiloeiro, dois clientes e ao menos um lote publicado com lances abertos. Depois de `npm run seed` (as 3 contas), rode:
 
 ```bash
 cd backend
-node scripts/seed-demo.js                                  # API local
-API_URL=https://teste-fullstack-verzel.onrender.com node scripts/seed-demo.js   # API publicada (Linux/macOS)
-$env:API_URL="https://teste-fullstack-verzel.onrender.com"; node scripts/seed-demo.js   # API publicada (PowerShell)
+npm run seed-demo            # só cria se o leiloeiro de teste ainda não tiver lotes
+npm run seed-demo -- --force # cria de novo mesmo assim
 ```
 
-Cria 6 lotes de obras do Art Institute of Chicago: 4 ao vivo (3 já com lances dos dois licitantes, terminando em 4 a 7 dias) e 2 agendados. Para apagar tudo e recomeçar, use `node scripts/clear-lots.js --confirm`.
+Grava direto no banco (não precisa da API no ar; use o mesmo `AUDIT_SECRET` da API), com 13 pinturas em domínio público do Art Institute of Chicago (lista em `backend/src/db/demo-artworks.js`, copiada da API do museu): **6 ao vivo** (4 com lances dos dois licitantes), **3 agendados** e **4 encerrados** (3 arrematados, com comprovante e extrato, e 1 sem lances). Os lances seguem as mesmas regras da API (mínimo, incremento, líder não cobre o próprio lance, saldo comprometido), são selados com HMAC e os encerrados passam pela mesma liquidação do servidor. Para recomeçar: `node scripts/clear-lots.js --confirm` e `npm run seed-demo`.
+
+**Vitrine viva:** com `DEMO_KEEPALIVE=true` na API (já ligado no Docker), sempre que houver menos de 3 lotes ao vivo o leiloeiro de teste abre lotes novos com obras da lista, na subida e a cada hora. Assim a avaliação encontra lotes ao vivo mesmo semanas depois. No Render, basta criar a variável.
 
 ## Rodar com Docker
 
@@ -253,7 +258,7 @@ docker compose up --build
 - Front-end: http://localhost:5173
 - API: http://localhost:3000/health
 
-O Compose sobe o PostgreSQL, a API e o front. O back-end aplica o schema e cria as contas de teste sozinho na subida. Para criar os lotes de demonstração, em outro terminal: `cd backend && node scripts/seed-demo.js` (precisa de Node 20 e `npm install`). Para zerar o banco do Docker: `docker compose down -v`.
+O Compose sobe o PostgreSQL, a API e o front. Na subida, o back-end aplica o schema e cria as contas de teste e os lotes de demonstração sozinho. Para zerar o banco do Docker: `docker compose down -v`.
 
 ## Cancelamento de lote
 
@@ -265,7 +270,7 @@ As cores são variáveis CSS. O botão no cabeçalho alterna entre claro e escur
 
 ## Comportamentos inesperados e limitações conhecidas
 
-- **API gratuita "dormindo":** a API no Render pode levar cerca de 50 s para responder à primeira requisição.
+- **API gratuita "dormindo":** a API no Render pode levar cerca de 50 s para responder à primeira requisição. Enquanto isso, o front mostra uma tela de carregamento que avisa que o servidor está acordando.
 - **Imagens das obras:** o museu bloqueia o carregamento direto pelo navegador, então a imagem passa pela nossa API (`GET /lots/:id/image`). Se a imagem não puder ser carregada, a tela mostra um aviso, mas o lote continua funcionando (os dados da obra são copiados para o nosso banco).
 - **Prorrogação:** um lance nos últimos 2 minutos empurra o fim em +2 minutos, então o horário de término pode mudar enquanto a pessoa está na sala do lote.
 - **Liquidação:** o job roda a cada 5 s. Entre o fim do lote e a liquidação, o licitante pode ver o estado "liquidando" por alguns segundos.

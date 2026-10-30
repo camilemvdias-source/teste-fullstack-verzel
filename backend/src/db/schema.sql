@@ -66,5 +66,14 @@ CREATE TABLE IF NOT EXISTS ledger (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Cópia local das imagens das obras (o lote guarda a URL do museu em image_url).
+-- Com ela, vitrine, sala, auditoria e comprovante não dependem da API do museu.
+CREATE TABLE IF NOT EXISTS artwork_images (
+  image_url TEXT PRIMARY KEY,
+  content_type TEXT NOT NULL,
+  data BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE INDEX IF NOT EXISTS idx_bids_lot ON bids(lot_id);
 CREATE INDEX IF NOT EXISTS idx_lots_status_end ON lots(status, ends_at);

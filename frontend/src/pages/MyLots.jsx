@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import ArtImage from '../components/ArtImage.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
+import { RowSkeletons } from '../components/Skeleton.jsx';
 import { brl, formatDateTime } from '../lib/format.js';
 
 export default function MyLots() {
@@ -61,17 +62,17 @@ export default function MyLots() {
         </div>
       )}
 
-      {!data && !error && <p className="center muted">Carregando…</p>}
+      {!data && !error && <RowSkeletons />}
       {data?.items.length === 0 && <p className="center muted">Você ainda não criou nenhum lote.</p>}
 
       <div className="stack">
         {data?.items.map((lot) => (
-          <div key={lot.id} className="card row-lot">
+          <div key={lot.id} className="row-lot">
             <ArtImage className="row-thumb" lotId={lot.id} alt={lot.title} />
             <div className="row-lot-info">
               {lot.status === 'cancelled'
-                ? <span className="badge badge-ended">Cancelado</span>
-                : <StatusBadge status={lot.status} />}
+                ? <span className="status status-cancelled">Lote {lot.id} · Cancelado</span>
+                : <span className="lot-meta-line">Lote {lot.id} <StatusBadge status={lot.status} /></span>}
               <h3>{lot.title}</h3>
               <small className="muted">
                 {formatDateTime(lot.startsAt)} → {formatDateTime(lot.endsAt)} · {lot.bidCount} {lot.bidCount === 1 ? 'lance' : 'lances'}
@@ -83,7 +84,9 @@ export default function MyLots() {
                 <strong className={lot.result.sold ? 'pos' : 'muted'}>
                   {lot.result.sold
                     ? `Vendido por ${brl(lot.result.finalPrice)} · Licitante #${lot.result.winnerCode}`
-                    : 'Encerrado sem lances'}
+                    : lot.bidCount > 0
+                      ? 'Encerrado · liquidando…' // a liquidação roda a cada 5 s
+                      : 'Encerrado sem lances'}
                 </strong>
               )}
             </div>
