@@ -4,7 +4,9 @@ import { api, ApiError } from '../api/client.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import ArtImage from '../components/ArtImage.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
-import { BackIcon, ShieldIcon, PinIcon, ClockIcon, ArrowIcon, HeartIcon } from '../components/Icons.jsx';
+import LotCard from '../components/LotCard.jsx';
+import { HeartIcon } from '../components/Icons.jsx';
+import { TimeBar, BidChart } from '../components/Charts.jsx';
 import { useFavorites } from '../hooks/useFavorites.js';
 import { useCountdown } from '../hooks/useCountdown.js';
 import { brl, formatDateTime, parseBrlToCents } from '../lib/format.js';
@@ -13,23 +15,17 @@ const ATTR_LABEL = {
   artist: 'Artista', date: 'Data', medium: 'Técnica', dimensions: 'Dimensões',
   placeOfOrigin: 'Origem', source: 'Acervo',
 };
-const pad = (n) => String(n).padStart(2, '0');
+const SOON_MS = 2 * 60 * 1000;
+const toInput = (cents) => (cents / 100).toFixed(2).replace('.', ',');
 
-// Texto descritivo montado com os dados reais da obra
-function describe(lot) {
-  const a = lot.attributes || {};
-  const artist = a.artist ? a.artist.split('\n')[0] : null;
-  const parts = [];
-  if (artist) parts.push(`“${lot.title}” é uma obra atribuída a ${artist}${a.date ? `, datada de ${a.date}` : ''}.`);
-  else parts.push(`“${lot.title}” integra o acervo de obras desta casa de leilões.`);
-  if (a.medium) parts.push(`Executada em ${a.medium.toLowerCase()}${a.dimensions ? `, a peça mede ${a.dimensions.split('\n')[0]}` : ''}.`);
-  if (a.placeOfOrigin) parts.push(`Sua origem é ${a.placeOfOrigin}.`);
-  parts.push('Cada lance é registrado em uma cadeia de selos verificável, e o histórico completo pode ser consultado na auditoria do lote.');
-  return parts.join(' ');
-}
-
+// A sala é montada do zero a cada lote (key): ao navegar por "Outros lotes ao vivo",
+// o valor digitado, os avisos e os dados do lote anterior não passam para o próximo.
 export default function LotDetail() {
   const { id } = useParams();
+  return <LotRoom key={id} id={id} />;
+}
+
+function LotRoom({ id }) {
   const { user, refreshUser } = useAuth();
   const role = user?.role;
   const { isFav, toggle: toggleFav } = useFavorites();
@@ -81,14 +77,18 @@ export default function LotDetail() {
   useEffect(() => {
     window.scrollTo(0, 0);
     api('/lots?status=live', { auth: false })
-      .then((d) => setOthers(d.items.filter((l) => String(l.id) !== String(id)).slice(0, 3)))
+      .then((d) => setOthers(d.items.filter((l) => String(l.id) !== String(id)).slice(0, 4)))
       .catch(() => {});
   }, [id]);
 
   const { ms, parts } = useCountdown(lot?.endsAt ?? new Date().toISOString(), lot?.serverTime);
 
   if (notFound) return <p className="center muted">Lote não encontrado. <Link to="/">Voltar aos leilões</Link></p>;
-  if (!lot) return loadError ? <div className="alert alert-error">{loadError}</div> : <p className="center muted">Carregando…</p>;
+  if (!lot) {
+    return loadError
+      ? <div className="alert alert-error">{loadError}</div>
+      : <div className="lot-detail" aria-busy="true"><div className="skeleton" style={{ aspectRatio: '4 / 3' }} /><div><div className="skeleton sk-line" style={{ width: '50%' }} /><div className="skeleton sk-line" style={{ height: 32 }} /><div className="skeleton" style={{ height: 220, marginTop: 20 }} /></div></div>;
+  }
 
   // O status vem do servidor; a contagem só trava o botão no instante exato
   const isLive = lot.status === 'live' && ms > 0;
@@ -97,20 +97,22 @@ export default function LotDetail() {
   const a = lot.attributes || {};
   const artistLines = a.artist ? a.artist.split('\n') : [];
   const attrs = Object.entries(a).filter(([k, v]) => v && ATTR_LABEL[k]);
+  const quick = [0, 1, 2].map((n) => lot.nextMinBid + n * lot.minIncrement);
 
   async function handleBid(e) {
     e.preventDefault();
     setBidError('');
     setBidOk('');
-    const cents = parseBrlToCents(amountText || String(lot.nextMinBid / 100));
+    // Sem digitar nada, vale o lance mínimo que já aparece no campo (em centavos, sem conversão)
+    const cents = touched ? parseBrlToCents(amountText) : lot.nextMinBid;
     if (cents == null) return setBidError('Digite um valor válido.');
 
     setSubmitting(true);
     try {
       const data = await api(`/lots/${lot.id}/bids`, { method: 'POST', body: { amount: cents } });
       setBidOk(data.lot.extended
-        ? `Lance de ${brl(cents)} registrado! O leilão foi prorrogado em 2 minutos.`
-        : `Lance de ${brl(cents)} registrado! Você está liderando.`);
+        ? `Lance de ${brl(cents)} registrado. O encerramento foi prorrogado em 2 minutos.`
+        : `Lance de ${brl(cents)} registrado. Você está liderando.`);
       setTouched(false);
       setAmountText('');
       await Promise.all([load(), refreshUser()]);
@@ -124,7 +126,7 @@ export default function LotDetail() {
 
   return (
     <div className="lot-page">
-      <Link to="/" className="back"><BackIcon width={16} height={16} /> Voltar aos leilões</Link>
+      <p className="crumbs"><Link to="/">Leilões</Link> / Lote {lot.id}</p>
 
       <div className="lot-detail">
         <div className="lot-frame">
@@ -132,159 +134,135 @@ export default function LotDetail() {
         </div>
 
         <div className="lot-info">
-          {artistLines[0] && <p className="lot-artist">{artistLines[0]}</p>}
-          {artistLines[1] && <p className="muted small">{artistLines.slice(1).join(' · ')}</p>}
+          <span className="lot-meta-line">Lote {lot.id} <StatusBadge status={lot.status} /></span>
+          {artistLines[0] && <p className="lot-artist">{a.artistName || artistLines[0]}</p>}
+          {a.artistName && artistLines[0] !== a.artistName && <p className="muted small" style={{ margin: 0 }}>{artistLines[0].replace(a.artistName, '').replace(/^[\s(]+|[)\s]+$/g, '')}</p>}
           <h1>{lot.title}</h1>
           <p className="lot-meta">
             {[a.date, a.medium].filter(Boolean).join(' · ')}
-            {a.dimensions && <><br />{a.dimensions.split('\n')[0]}</>}
+            {a.dimensions && <><br />{a.dimensions.split(';')[0]}</>}
           </p>
-          <div className="tags">
-            <StatusBadge status={lot.status} />
-            {a.placeOfOrigin && <span className="tag">{a.placeOfOrigin}</span>}
-            <button type="button" className={`fav-btn ${isFav(lot.id) ? 'on' : ''}`} aria-pressed={isFav(lot.id)} onClick={() => toggleFav(lot.id)}>
-              <HeartIcon width={14} height={14} /> {isFav(lot.id) ? 'Favoritado' : 'Favoritar'}
-            </button>
-          </div>
 
-          {position === 'winning' && <div className="status-flag winning" role="status">✔ Você está ganhando este lote</div>}
-          {position === 'outbid' && <div className="status-flag outbid" role="status">✘ Você foi superado. Dê um novo lance para voltar à disputa.</div>}
-          {position === 'won' && <div className="status-flag won" role="status">★ Você arrematou este lote. Veja o comprovante em Meus lances.</div>}
+          {position === 'winning' && <div className="status-flag winning" role="status">Você está ganhando este lote.</div>}
+          {position === 'outbid' && <div className="status-flag outbid" role="status">Você foi superado. Dê um novo lance para voltar à disputa.</div>}
+          {position === 'won' && <div className="status-flag won" role="status">Você arrematou este lote. O comprovante está em <Link to="/meus-lances">Meus lances</Link>.</div>}
           {position === 'lost' && <p className="muted small">Você deu lances neste lote, mas outro licitante arrematou.</p>}
 
-          <div className="price-box">
-            <div>
-              <span className="eyebrow">{lot.currentBid == null ? 'Lance inicial' : 'Lance atual'}</span>
-              <strong className="lot-price-big">{brl(lot.currentBid ?? lot.startingBid)}</strong>
+          <div className="bid-box">
+            <div className="bid-row">
+              <div>
+                <span className="eyebrow">{lot.status === 'ended' ? (lot.finalPrice != null ? 'Arrematado por' : 'Encerrado') : lot.currentBid == null ? 'Lance inicial' : 'Lance atual'}</span>
+                <span className="lot-price-big">{lot.status === 'ended' && lot.finalPrice == null && lot.bidCount === 0 ? 'Sem lances' : brl(lot.finalPrice ?? lot.currentBid ?? lot.startingBid)}</span>
+              </div>
+              <a href="#historico" className="small">{lot.bidCount} {lot.bidCount === 1 ? 'lance' : 'lances'}</a>
             </div>
-            <div>
-              <span className="eyebrow">Próximo lance mínimo</span>
-              <strong className="lot-price-next">{brl(lot.nextMinBid)}</strong>
-            </div>
+
+            {lot.status === 'live' && (
+              <div className="bid-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                <div className={`clock-blocks ${ms < SOON_MS ? 'soon' : ''}`} title={`Termina em ${formatDateTime(lot.endsAt)}`}>
+                  {[['d', 'dias'], ['h', 'horas'], ['m', 'min'], ['s', 'seg']].map(([k, l]) => (
+                    <div key={k}><b>{String(parts[k]).padStart(2, '0')}</b><small>{l}</small></div>
+                  ))}
+                </div>
+                <TimeBar startsAt={lot.startsAt} endsAt={lot.endsAt} urgent={ms < SOON_MS} />
+              </div>
+            )}
+            {lot.status === 'scheduled' && <p className="muted" style={{ marginTop: 0 }}>Abre para lances em {formatDateTime(lot.startsAt)}. Lance inicial {brl(lot.startingBid)}.</p>}
+            {lot.status === 'ended' && <p className="muted" style={{ marginTop: 0 }}>Encerrado em {formatDateTime(lot.endsAt)}.</p>}
+
+            {bidOk && <div className="alert alert-success" role="status">{bidOk}</div>}
+            {bidError && <div className="alert alert-error" role="alert">{bidError}</div>}
+
+            {isLive && canBid && (
+              <form onSubmit={handleBid} className="bid-form">
+                <div className="field">
+                  <label htmlFor="amount">Seu lance (mínimo {brl(lot.nextMinBid)})</label>
+                  <div className="money">
+                    <span>R$</span>
+                    <input
+                      id="amount" inputMode="decimal" autoComplete="off"
+                      value={touched ? amountText : toInput(lot.nextMinBid)}
+                      onChange={(e) => { setTouched(true); setAmountText(e.target.value); }}
+                    />
+                  </div>
+                </div>
+                <div className="quick" aria-label="Valores rápidos">
+                  {quick.map((v) => (
+                    <button key={v} type="button" className="btn btn-sm" onClick={() => { setTouched(true); setAmountText(toInput(v)); }}>{brl(v)}</button>
+                  ))}
+                </div>
+                <button className="btn btn-dark btn-block btn-lg" type="submit" disabled={submitting}>
+                  {submitting ? 'Enviando…' : 'Dar lance'}
+                </button>
+                {available != null && <p className="fine">Disponível: {brl(available)}</p>}
+              </form>
+            )}
+
+            {isLive && !user && (
+              <Link to="/login" state={{ from: `/lotes/${lot.id}` }} className="btn btn-dark btn-block btn-lg">Entrar para dar lance</Link>
+            )}
+            {isLive && user && !canBid && <p className="muted" style={{ marginBottom: 0 }}>Leiloeiros não dão lances.</p>}
+            {lot.status === 'live' && ms < SOON_MS && <p className="fine">Lances agora prorrogam o fim em 2 min.</p>}
           </div>
-          <p className="muted small">
-            {lot.bidCount} {lot.bidCount === 1 ? 'lance' : 'lances'} · incremento mínimo {brl(lot.minIncrement)}
-          </p>
 
-          {lot.status === 'live' && (
-            <div className="countdown-box">
-              <span className="eyebrow">Leilão encerra em</span>
-              <div className="countdown">
-                <div><b>{pad(parts.h + parts.d * 24)}</b><small>horas</small></div><i>:</i>
-                <div><b>{pad(parts.m)}</b><small>min</small></div><i>:</i>
-                <div><b>{pad(parts.s)}</b><small>seg</small></div>
-              </div>
-            </div>
-          )}
-          {lot.status === 'scheduled' && <p className="muted">Começa em {formatDateTime(lot.startsAt)}</p>}
-          {lot.status === 'ended' && <p className="muted">Encerrado em {formatDateTime(lot.endsAt)}</p>}
-
-          {bidOk && <div className="alert alert-success" role="status">{bidOk}</div>}
-          {bidError && <div className="alert alert-error" role="alert">{bidError}</div>}
-
-          {isLive && canBid && (
-            <form onSubmit={handleBid} className="bid-form">
-              <div className="field">
-                <label htmlFor="amount">Seu lance (mínimo {brl(lot.nextMinBid)})</label>
-                <input
-                  id="amount" inputMode="decimal" autoComplete="off"
-                  value={touched ? amountText : (amountText || (lot.nextMinBid / 100).toFixed(2).replace('.', ','))}
-                  onChange={(e) => { setTouched(true); setAmountText(e.target.value); }}
-                />
-                {available != null && <small className="muted">Saldo disponível: {brl(available)}</small>}
-              </div>
-              <button className="btn btn-dark btn-block btn-lg" type="submit" disabled={submitting}>
-                {submitting ? 'Enviando…' : 'Dar lance'}
-              </button>
-            </form>
-          )}
-
-          {isLive && !user && (
-            <Link to="/login" state={{ from: `/lotes/${lot.id}` }} className="btn btn-dark btn-block btn-lg">Entre para dar lance</Link>
-          )}
-          {isLive && user && !canBid && <p className="muted">Apenas licitantes podem dar lances.</p>}
+          <button type="button" className={`fav-btn ${isFav(lot.id) ? 'on' : ''}`} aria-pressed={isFav(lot.id)} onClick={() => toggleFav(lot.id)}>
+            <HeartIcon width={16} height={16} /> {isFav(lot.id) ? 'Nos favoritos' : 'Adicionar aos favoritos'}
+          </button>
         </div>
       </div>
 
-      <div className="trust">
-        <div>
-          <ShieldIcon />
-          <span><b>Autenticidade</b><small>{a.source ? `Dados do acervo ${a.source}` : 'Certificado e procedência'}</small></span>
-        </div>
-        <div>
-          <PinIcon />
-          <span><b>Proveniência</b><small>{a.placeOfOrigin ? `Origem: ${a.placeOfOrigin}` : 'Coleção particular'}</small></span>
-        </div>
-        <div>
-          <ClockIcon />
-          <span>
-            <b>Histórico de lances</b>
-            <small>
-              {lot.bidCount > 0
-                ? <>{lot.bidCount} {lot.bidCount === 1 ? 'lance' : 'lances'} · <Link to={`/auditoria/${lot.id}`}>ver auditoria</Link></>
-                : 'Nenhum lance até agora'}
-            </small>
-          </span>
-        </div>
+      <div className="about about-grid">
+        <section id="historico">
+          <h2>Histórico de lances</h2>
+          {history.length === 0 && <p className="muted">Nenhum lance até agora.</p>}
+          <BidChart startingBid={lot.startingBid} bids={[...history].reverse().map((b) => ({ ...b, mine: user?.publicCode && b.bidderCode === user.publicCode }))} />
+          {history.length > 0 && (
+            <div className="table-wrap">
+              <table className="table">
+                <thead><tr><th>#</th><th>Licitante</th><th className="num">Valor</th><th>Data</th></tr></thead>
+                <tbody>
+                  {history.map((b) => {
+                    const mine = user?.publicCode && b.bidderCode === user.publicCode;
+                    return (
+                      <tr key={b.seq} className={mine ? 'you' : ''}>
+                        <td>{b.seq}</td>
+                        <td>{mine ? 'Você' : `Licitante #${b.bidderCode}`}</td>
+                        <td className="num">{brl(b.amount)}</td>
+                        <td>{formatDateTime(b.createdAt)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="fine"><Link to={`/auditoria/${lot.id}`}>Auditoria pública do lote</Link></p>
+        </section>
+
+        <section>
+          <h2>Detalhes da obra</h2>
+          {attrs.length > 0 && (
+            <dl className="attrs">
+              {attrs.map(([k, v]) => (
+                <div key={k} style={{ display: 'contents' }}>
+                  <dt>{ATTR_LABEL[k]}</dt>
+                  <dd>
+                    {k === 'source' && a.sourceUrl
+                      ? <a href={a.sourceUrl} target="_blank" rel="noreferrer">{String(v)}</a>
+                      : String(v).split('\n')[0]}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </section>
       </div>
-
-      <section className="about">
-        <h2>Histórico de lances</h2>
-        {history.length === 0 && <p className="muted">Nenhum lance até agora. Seja o primeiro.</p>}
-        {history.length > 0 && (
-          <div className="history-wrap">
-            <table className="table history-table">
-              <thead><tr><th>#</th><th>Licitante</th><th className="num">Valor</th><th>Data</th></tr></thead>
-              <tbody>
-                {history.map((b) => {
-                  const mine = user?.publicCode && b.bidderCode === user.publicCode;
-                  return (
-                    <tr key={b.seq} className={mine ? 'you' : ''}>
-                      <td>{b.seq}</td>
-                      <td>{mine ? 'Você' : `Licitante #${b.bidderCode}`}</td>
-                      <td className="num">{brl(b.amount)}</td>
-                      <td>{formatDateTime(b.createdAt)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section className="about">
-        <h2>Sobre a obra</h2>
-        <p>{describe(lot)}</p>
-        {attrs.length > 0 && (
-          <dl className="attrs">
-            {attrs.map(([k, v]) => (
-              <div key={k}>
-                <dt>{ATTR_LABEL[k]}</dt>
-                <dd>
-                  {k === 'source' && a.sourceUrl
-                    ? <a href={a.sourceUrl} target="_blank" rel="noreferrer">{String(v)}</a>
-                    : String(v).split('\n')[0]}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        )}
-      </section>
 
       {others.length > 0 && (
         <section className="about">
-          <div className="section-head">
-            <h2>Mais obras em leilão</h2>
-            <Link to="/" className="link-arrow">Ver todos <ArrowIcon width={16} height={16} /></Link>
-          </div>
-          <div className="more-grid">
-            {others.map((o) => (
-              <Link key={o.id} to={`/lotes/${o.id}`} className="more-item">
-                <ArtImage lotId={o.id} alt={o.title} />
-                <span>{o.title}</span>
-              </Link>
-            ))}
+          <h2>Outros lotes ao vivo</h2>
+          <div className="lot-grid">
+            {others.map((o) => <LotCard key={o.id} lot={o} />)}
           </div>
         </section>
       )}

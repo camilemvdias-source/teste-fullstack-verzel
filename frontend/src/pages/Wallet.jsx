@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { brl, formatDateTime, parseBrlToCents } from '../lib/format.js';
+import { BalanceBar } from '../components/Charts.jsx';
 
 const TYPE_LABEL = {
   deposit: 'Depósito',
@@ -56,11 +57,14 @@ export default function Wallet() {
       {ok && <div className="alert alert-success" role="status">{ok}</div>}
 
       {b && (
-        <div className="balance-grid">
-          <div className="card"><span className="muted">Disponível</span><strong>{brl(b.available)}</strong></div>
-          <div className="card"><span className="muted">Comprometido em lances</span><strong>{brl(b.committed)}</strong></div>
-          <div className="card"><span className="muted">Total</span><strong>{brl(b.total)}</strong></div>
-        </div>
+        <>
+          <div className="balance-grid">
+            <div className="card"><span className="legend muted" style={{ '--c': 'var(--ok)' }}>Disponível</span><strong>{brl(b.available)}</strong></div>
+            <div className="card"><span className="legend muted" style={{ '--c': 'var(--warn)' }}>Em lances</span><strong>{brl(b.committed)}</strong></div>
+            <div className="card"><span className="muted">Total</span><strong>{brl(b.total)}</strong></div>
+          </div>
+          <BalanceBar available={b.available} committed={b.committed} />
+        </>
       )}
 
       {user?.role === 'bidder' && (

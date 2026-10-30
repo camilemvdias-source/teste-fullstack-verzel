@@ -28,6 +28,7 @@ services:
       PUBLIC_CODE_SECRET: troque-este-outro-segredo-no-docker
       AUDIT_SECRET: troque-a-chave-da-auditoria-no-docker
       FRONTEND_URL: http://localhost:5173
+      DEMO_KEEPALIVE: "true"
     ports:
       - "3000:3000"
     depends_on:

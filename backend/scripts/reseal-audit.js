@@ -5,6 +5,8 @@
 // Só refaz um lote se a cadeia ANTIGA estiver íntegra hoje; lotes já em HMAC são ignorados;
 // lotes inconsistentes são apenas listados (nada é apagado). Rode UMA vez, logo após o deploy,
 // confiando no estado atual do banco: depois disso o verificador só aceita HMAC.
+// Lances dados entre o deploy e esta migração já saem em HMAC, por cima dos antigos: a cadeia
+// fica "antigo → HMAC" e também é refeita. A ordem contrária (HMAC → antigo) é recusada.
 import 'dotenv/config';
 import crypto from 'node:crypto';
 import { pool } from '../src/db/pool.js';
@@ -39,7 +41,7 @@ for (const { id } of lots) {
     };
 
     if (verifyChain(input).intact) { already++; await client.query('ROLLBACK'); continue; }
-    const legacy = verifyChain(input, legacyHash);
+    const legacy = verifyChain(input, [legacyHash, computeBidHash]);
     if (!legacy.intact) {
       console.log(`lote ${id}: PULADO (cadeia antiga inconsistente: ${legacy.code})`);
       skipped++; await client.query('ROLLBACK'); continue;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { ApiError } from '../api/client.js';
 
@@ -14,7 +14,6 @@ function firstMessage(err) {
 
 export default function Login() {
   const { user, loading, login, register } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
 
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -28,8 +27,9 @@ export default function Login() {
   // Ainda confirmando quem é a pessoa (há token guardado): não mostra o formulário por engano
   if (loading) return <p className="center muted">Carregando…</p>;
 
-  // Já está logado: não faz sentido ver esta tela
-  if (user) return <Navigate to="/" replace />;
+  // Já está logado (ou acabou de entrar): volta para a página que pediu o login.
+  // É o único redirecionamento: um navigate() no submit competia com este e a pessoa ia para o início.
+  if (user) return <Navigate to={location.state?.from || '/'} replace />;
 
   const isRegister = mode === 'register';
 
@@ -48,7 +48,6 @@ export default function Login() {
       } else {
         await login(email, password);
       }
-      navigate(location.state?.from || '/', { replace: true });
     } catch (err) {
       setError(firstMessage(err));
     } finally {
@@ -66,7 +65,7 @@ export default function Login() {
             Entrar
           </button>
           <button type="button" className={`tab ${isRegister ? 'active' : ''}`} onClick={() => switchMode('register')}>
-            Cadastrar
+            Criar conta
           </button>
         </div>
 
@@ -115,6 +114,11 @@ export default function Login() {
             {submitting ? 'Aguarde…' : isRegister ? 'Criar conta' : 'Entrar'}
           </button>
         </form>
+        {!isRegister && (
+          <p className="demo-accounts">
+            Contas de teste (senha <code>Leilao@2026</code>): <code>leiloeiro@teste.com</code>, <code>licitante1@teste.com</code> e <code>licitante2@teste.com</code>.
+          </p>
+        )}
       </div>
     </div>
   );

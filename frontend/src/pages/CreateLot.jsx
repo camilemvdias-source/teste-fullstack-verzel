@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api, ApiError } from '../api/client.js';
+import { api, ApiError, API_URL } from '../api/client.js';
+import ArtImage from '../components/ArtImage.jsx';
 import { parseBrlToCents } from '../lib/format.js';
 
 function firstMessage(err) {
@@ -85,28 +86,32 @@ export default function CreateLot() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h3>1. Escolha a obra</h3>
+        <h2>1. Escolha a obra</h2>
+        <p className="fine" style={{ marginTop: -6, marginBottom: 12 }}>Pinturas em domínio público do Art Institute of Chicago. Os dados e a imagem são copiados para a casa ao criar o lote.</p>
         <form onSubmit={handleSearch} className="search-row">
           <input
             value={q} onChange={(e) => setQ(e.target.value)} minLength={2} required
-            placeholder="Ex.: monet, water lilies, van gogh" aria-label="Buscar obra no museu"
+            placeholder="Artista ou título (ex.: monet, landscape, portrait)" aria-label="Buscar pintura no acervo do museu"
           />
           <button className="btn btn-primary" type="submit" disabled={searching}>
             {searching ? 'Buscando…' : 'Buscar'}
           </button>
         </form>
         {searchError && <div className="alert alert-error" role="alert" style={{ marginTop: 12 }}>{searchError}</div>}
-        {results?.length === 0 && <p className="muted">Nenhuma obra com imagem encontrada.</p>}
+        {results?.length === 0 && <p className="muted">Nenhuma pintura em domínio público encontrada para a busca.</p>}
         {results?.length > 0 && (
-          <ul className="pick-list">
+          <ul className="pick-grid">
             {results.map((a) => (
               <li key={a.id}>
                 <button
                   type="button" className={`pick ${artwork?.id === a.id ? 'selected' : ''}`}
+                  aria-pressed={artwork?.id === a.id}
                   onClick={() => setArtwork(a)}
                 >
+                  <ArtImage src={`${API_URL}/external/images/${a.imageId}`} alt="" />
+                  <small>{a.artist}</small>
                   <strong>{a.title}</strong>
-                  <small className="muted">{[a.artist, a.date].filter(Boolean).join(' · ')}</small>
+                  <small>{a.date}</small>
                 </button>
               </li>
             ))}
@@ -115,7 +120,7 @@ export default function CreateLot() {
       </div>
 
       <form className="card" onSubmit={handleSubmit}>
-        <h3>2. Defina o leilão</h3>
+        <h2>2. Defina o leilão</h2>
         {artwork && <p>Obra escolhida: <strong>{artwork.title}</strong></p>}
         {error && <div className="alert alert-error" role="alert">{error}</div>}
 
@@ -139,7 +144,7 @@ export default function CreateLot() {
         </div>
 
         <button className="btn btn-primary" type="submit" disabled={submitting || !artwork}>
-          {submitting ? 'Criando…' : 'Criar lote'}
+          {submitting ? 'Publicando…' : 'Publicar lote'}
         </button>
       </form>
     </>

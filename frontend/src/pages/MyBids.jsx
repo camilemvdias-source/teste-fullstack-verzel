@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import ArtImage from '../components/ArtImage.jsx';
 import { brl, formatDateTime } from '../lib/format.js';
+import { copyLink } from '../lib/share.js';
+import { RowSkeletons } from '../components/Skeleton.jsx';
 
 const POSITION = {
   winning: { label: 'Liderando', cls: 'badge-live' },
@@ -17,6 +19,7 @@ export default function MyBids() {
   const [bids, setBids] = useState(null);
   const [wins, setWins] = useState(null);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -50,7 +53,7 @@ export default function MyBids() {
       </div>
 
       {error && <div className="alert alert-error" role="alert">{error}</div>}
-      {loading && <p className="center muted">Carregando…</p>}
+      {loading && <RowSkeletons />}
 
       {tab === 'bids' && bids?.length === 0 && <p className="center muted">Você ainda não deu nenhum lance.</p>}
       {tab === 'bids' && bids?.length > 0 && (
@@ -58,10 +61,11 @@ export default function MyBids() {
           {bids.map((b) => {
             const pos = POSITION[b.position];
             return (
-              <div key={b.lotId} className="card row-lot">
+              <div key={b.lotId} className="row-lot">
                 <ArtImage className="row-thumb" lotId={b.lotId} alt={b.title} />
                 <div className="row-lot-info">
                   <span className={`badge ${pos.cls}`}>{pos.label}</span>
+                  <small className="muted">Lote {b.lotId}</small>
                   <h3>{b.title}</h3>
                   <small className="muted">
                     Seu melhor lance {brl(b.myBestBid)} · lance atual {b.currentBid == null ? '—' : brl(b.currentBid)} ·{' '}
@@ -81,15 +85,19 @@ export default function MyBids() {
       {tab === 'wins' && wins?.length > 0 && (
         <div className="stack">
           {wins.map((w) => (
-            <div key={w.receiptToken} className="card row-lot">
+            <div key={w.receiptToken} className="row-lot">
               <ArtImage className="row-thumb" lotId={w.lotId} alt={w.title} />
               <div className="row-lot-info">
+                <small className="muted">Lote {w.lotId}</small>
                 <h3>{w.title}</h3>
                 <strong>{brl(w.amount)}</strong>
                 <small className="muted">Arrematado em {formatDateTime(w.wonAt)}</small>
               </div>
               <div className="row-lot-actions">
                 <Link to={`/comprovante/${w.receiptToken}`}>Ver comprovante</Link>
+                <button type="button" className="btn btn-sm" onClick={async () => { if (await copyLink(`/comprovante/${w.receiptToken}`)) setCopied(w.receiptToken); }}>
+                  {copied === w.receiptToken ? 'Link copiado' : 'Copiar link'}
+                </button>
               </div>
             </div>
           ))}

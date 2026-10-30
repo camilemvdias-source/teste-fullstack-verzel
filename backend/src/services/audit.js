@@ -4,14 +4,18 @@ import { GENESIS_HASH, computeBidHash } from './hashChain.js';
 // e compara com o que está gravado. Devolve { intact, brokenAt, code, reason }.
 // "brokenAt" é o número (seq) do lance onde a cadeia deixou de bater.
 // hashFn só é trocado pelo script de migração (reseal-audit.js) para ler selos antigos.
+// Pode ser uma lista de formatos em ordem cronológica ([antigo, HMAC]): cada lance usa o
+// formato do lance anterior ou um mais novo, nunca volta para um mais antigo.
 export function verifyChain(
   { lotId, bidCount, lastHash, bids, receiptFinalHash },
   hashFn = computeBidHash
 ) {
   const broken = (brokenAt, code, reason) => ({ intact: false, brokenAt, code, reason });
+  const hashFns = Array.isArray(hashFn) ? hashFn : [hashFn];
 
   let prevHash = GENESIS_HASH;
   let expectedSeq = 1;
+  let format = 0;
 
   for (const bid of bids) {
     // 1) A numeração tem que ser 1, 2, 3... sem buracos (pega lance apagado do meio)
@@ -34,15 +38,16 @@ export function verifyChain(
 
     // 3) Recalcula o selo com os dados que estão no banco agora. Se alguém mudou
     //    valor, data ou licitante, o resultado deixa de bater com o selo gravado.
-    const expectedHash = hashFn({
+    const data = {
       lotId,
       seq: bid.seq,
       publicCode: bid.public_code,
       amount: Number(bid.amount),
       createdAt: new Date(bid.created_at),
       prevHash,
-    });
-    if (expectedHash !== bid.hash) {
+    };
+    const matched = hashFns.findIndex((fn, i) => i >= format && fn(data) === bid.hash);
+    if (matched === -1) {
       return broken(
         bid.seq,
         'BID_ALTERED',
@@ -50,6 +55,7 @@ export function verifyChain(
       );
     }
 
+    format = matched;
     prevHash = bid.hash;
     expectedSeq += 1;
   }
