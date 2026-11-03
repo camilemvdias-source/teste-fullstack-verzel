@@ -33,7 +33,7 @@ Também é possível criar contas novas pela tela de cadastro.
 | Rota | Quem acessa | O que faz |
 |---|---|---|
 | `/` | público | Início: destaques, busca e lotes em leilão, agendados e encerrados |
-| `/lotes/:id` | público | Sala do lote: lance atual, histórico de lances, contagem regressiva, selo "você está ganhando / foi superado" e lances (licitante). Atualiza a cada 2 s |
+| `/lotes/:id` | público | Sala do lote: lance atual, histórico de lances, contagem regressiva, selo "você está ganhando / foi superado" e lances (licitante). Atualiza em tempo real (SSE) |
 | `/login` | público | Entrar e cadastrar |
 | `/carteira` | logado | Saldo, depósito (licitante) e extrato |
 | `/meus-lances` | licitante | Situação de cada lance e lotes arrematados |
@@ -213,7 +213,7 @@ cd backend
 npm test
 ```
 
-Roda os testes da auditoria (HMAC encadeado e detecção de adulteração, 21 testes), que não precisam de banco. A chave usada nos testes é definida no próprio arquivo de teste.
+Roda os testes da auditoria (HMAC encadeado e detecção de adulteração, 21 testes) e do canal de tempo real (SSE, 4 testes), que não precisam de banco. A chave usada nos testes é definida no próprio arquivo de teste.
 
 No front-end, `cd frontend && npm test` roda os testes da conversão dos valores digitados (R$ → centavos).
 
@@ -280,7 +280,7 @@ As cores são variáveis CSS. O botão no cabeçalho alterna entre claro e escur
 - **Liquidação:** o job roda a cada 5 s. Entre o fim do lote e a liquidação, o licitante pode ver o estado "liquidando" por alguns segundos.
 - **Cancelamento:** só é possível em lote sem lances (regra do enunciado); por isso não há estorno de saldo a fazer.
 - **Auditoria:** detecta alterações no banco, inclusive o refazimento completo da cadeia sem a chave; não protege contra quem obtiver `AUDIT_SECRET` (veja "Limite assumido" acima).
-- **Atualização:** o front usa polling (a cada 2 s na sala do lote, 10 s na vitrine), não WebSocket/SSE.
+- **Tempo real (SSE):** a sala do lote assina `GET /lots/:id/events` e a vitrine assina `GET /lots/events`. O servidor publica um evento depois do COMMIT de cada lance, encerramento, cancelamento ou lote novo, e a tela recarrega na hora. O evento não traz quem deu o lance. Se a conexão cair, o navegador reconecta sozinho e, enquanto isso, a tela volta ao polling (2 s na sala, 10 s na vitrine). O canal de eventos fica em memória, o que vale para uma instância só (o plano do Render roda uma); com várias instâncias, a troca seria publicar via Redis ou `LISTEN/NOTIFY` do Postgres.
 - **Fora do escopo (conforme o enunciado):** nota fiscal, revenda entre usuários, app nativo e recuperação de senha.
 
 ## Uso de IA

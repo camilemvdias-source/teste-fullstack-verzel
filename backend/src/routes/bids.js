@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { GENESIS_HASH, computeBidHash } from '../services/hashChain.js';
+import { publish } from '../services/events.js';
 
 const router = Router();
 
@@ -180,6 +181,17 @@ router.post('/:id/bids', requireAuth, requireRole('bidder'), async (req, res) =>
     );
 
     await client.query('COMMIT');
+
+    // Só depois do COMMIT: avisa quem está na sala e na vitrine (sem dados de quem deu o lance)
+    publish(lot.id, {
+      type: 'bid',
+      seq,
+      currentBid: amount,
+      nextMinBid: amount + increment,
+      bidCount: seq,
+      endsAt: newEndsAt.toISOString(),
+      extended,
+    });
 
     const total = Number(updatedBidder.rows[0].balance_total);
     const committed = Number(updatedBidder.rows[0].balance_committed);

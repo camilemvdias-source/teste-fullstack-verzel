@@ -570,3 +570,14 @@ button { font: inherit; color: inherit; }
 }
 .tabs-scroll { scrollbar-width: none; } .tabs-scroll::-webkit-scrollbar { display: none; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- Tempo real ---------- */
+.live-state { display: inline-flex; align-items: center; gap: 8px; opacity: .8; }
+.live-state::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #c9bba8; }
+.live-state.on { opacity: 1; }
+.live-state.on::before { background: #6fd39a; box-shadow: 0 0 0 3px rgba(111, 211, 154, .25); }
+.live-note { background: var(--gold); color: #1e1712; padding: 10px 26px; font-size: 0.82rem; font-weight: 600; animation: slidein .3s ease; }
+@keyframes slidein { from { opacity: 0; transform: translateY(-6px); } }
+.flash { animation: flash 1.2s ease; }
+@keyframes flash { 0% { color: var(--gold); transform: scale(1.04); transform-origin: left; } 100% { color: inherit; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .flash, .live-note { animation: none; } }

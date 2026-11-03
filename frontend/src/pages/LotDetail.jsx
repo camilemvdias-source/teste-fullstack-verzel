@@ -11,6 +11,7 @@ import { RoomSkeleton } from '../components/Skeleton.jsx';
 import { EmptyState, ErrorState, LotNumber, Notice } from '../components/States.jsx';
 import { useFavorites } from '../hooks/useFavorites.js';
 import { useCountdown } from '../hooks/useCountdown.js';
+import { useLiveEvents } from '../hooks/useLiveEvents.js';
 import { brl, formatDateTime, parseBrlToCents } from '../lib/format.js';
 
 const ATTR_LABEL = {
@@ -76,12 +77,27 @@ function LotRoom({ id }) {
     }
   }, [id, role]);
 
-  useEffect(() => {
-    // Lance novo de outra pessoa aparece em poucos segundos (polling de 2s)
-    const first = setTimeout(load, 0);
-    const t = setInterval(load, 2000);
-    return () => { clearTimeout(first); clearInterval(t); };
+  // Tempo real (SSE): o servidor avisa na hora quando entra um lance, o lote encerra ou é
+  // cancelado. Ao receber, a sala recarrega os dados. Se a conexão cair, volta o polling de 2 s.
+  const [liveNote, setLiveNote] = useState('');
+  const onLiveEvent = useCallback((e) => {
+    if (e.type === 'bid') setLiveNote(`Novo lance agora: ${brl(e.currentBid)}${e.extended ? ' · encerramento prorrogado' : ''}`);
+    if (e.type === 'ended') setLiveNote('O leilão acaba de ser encerrado.');
+    load();
   }, [load]);
+  const live = useLiveEvents(`/lots/${id}/events`, onLiveEvent);
+
+  useEffect(() => {
+    const first = setTimeout(load, 0);
+    const t = setInterval(load, live ? 30000 : 2000);
+    return () => { clearTimeout(first); clearInterval(t); };
+  }, [load, live]);
+
+  useEffect(() => {
+    if (!liveNote) return;
+    const t = setTimeout(() => setLiveNote(''), 4000);
+    return () => clearTimeout(t);
+  }, [liveNote]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -187,8 +203,11 @@ function LotRoom({ id }) {
           <div className="panel">
             <div className="panel-head">
               <span>{lot.status === 'live' ? 'Sala de lances' : lot.status === 'scheduled' ? 'Leilão agendado' : 'Resultado do leilão'}</span>
-              <Link to={`/auditoria/${lot.id}`}>Auditoria</Link>
+              <span className={`live-state ${live ? 'on' : ''}`} title={live ? 'Recebendo lances em tempo real' : 'Reconectando… atualizando a cada 2 s'}>
+                {live ? 'Tempo real' : 'Reconectando…'}
+              </span>
             </div>
+            {liveNote && <div className="live-note" role="status">{liveNote}</div>}
             {pos && (
               <div className={`position position-${pos.cls}`} role="status">
                 <span>{pos.text}{position === 'won' && <> <Link to="/meus-lances" style={{ color: 'inherit' }}>Ver comprovante</Link></>}</span>
@@ -199,7 +218,7 @@ function LotRoom({ id }) {
               <div className="panel-price">
                 <div>
                   <span className="eyebrow">{priceLabel}</span>
-                  <span className="big-price">{priceValue}</span>
+                  <span className="big-price flash" key={lot.bidCount}>{priceValue}</span>
                 </div>
                 <a href="#livro">{lot.bidCount} {lot.bidCount === 1 ? 'lance' : 'lances'}</a>
               </div>

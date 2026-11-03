@@ -7,6 +7,7 @@ import ArtImage from '../components/ArtImage.jsx';
 import { lotImageUrl } from '../lib/images.js';
 import { brl } from '../lib/format.js';
 import { useCountdown } from '../hooks/useCountdown.js';
+import { useLiveEvents } from '../hooks/useLiveEvents.js';
 import { CardSkeletons } from '../components/Skeleton.jsx';
 import { EmptyState, ErrorState, LotNumber } from '../components/States.jsx';
 import { HeartIcon, SearchIcon, GavelIcon, CalendarIcon, FrameIcon, ShieldIcon, UserIcon, SealIcon, WalletIcon, ClockIcon, ScrollIcon } from '../components/Icons.jsx';
@@ -47,13 +48,16 @@ export default function Home() {
     }
   }, []);
 
+  // Tempo real (SSE): qualquer lance, lote novo ou encerramento recarrega a vitrine na hora.
+  // O polling continua como reserva, mais espaçado quando a conexão está de pé.
+  const connected = useLiveEvents('/lots/events', load);
+
   useEffect(() => {
     const first = setTimeout(load, 0);
-    // Atualiza sozinho: o preço e os lotes mudam enquanto a pessoa olha
-    const t = setInterval(load, 10000);
+    const t = setInterval(load, connected ? 60000 : 10000);
     window.addEventListener('api:ready', load);
     return () => { clearTimeout(first); clearInterval(t); window.removeEventListener('api:ready', load); };
-  }, [load]);
+  }, [load, connected]);
 
   const counts = useMemo(() => {
     const c = { live: 0, scheduled: 0, ended: 0 };

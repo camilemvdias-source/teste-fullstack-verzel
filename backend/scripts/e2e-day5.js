@@ -60,6 +60,43 @@ async function loginAll() {
   };
 }
 
+// Abre um fluxo SSE e guarda os eventos que chegarem (para testar o tempo real)
+async function listen(path) {
+  const ctrl = new AbortController();
+  const res = await fetch(`${BASE}${path}`, { signal: ctrl.signal });
+  const events = [];
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  (async () => {
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let i;
+        while ((i = buffer.indexOf('\n\n')) >= 0) {
+          const block = buffer.slice(0, i);
+          buffer = buffer.slice(i + 2);
+          const data = block.split('\n').find((l) => l.startsWith('data: '));
+          const isReady = block.includes('event: ready');
+          if (data && !isReady) events.push(JSON.parse(data.slice(6)));
+        }
+      }
+    } catch { /* fechado */ }
+  })();
+  const waitFor = async (pred, ms = 3000) => {
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      const hit = events.find(pred);
+      if (hit) return hit;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return null;
+  };
+  return { res, events, waitFor, close: () => ctrl.abort() };
+}
+
 const bid = (token, lotId, amount) =>
   api('POST', `/lots/${lotId}/bids`, { token, body: { amount } });
 
@@ -119,10 +156,25 @@ async function start() {
   r = await bid(t.b1, lotId, 120000);
   check('b1 retoma a liderança (201)', r.status === 201, `(veio ${r.status}: ${r.text})`);
 
+  // Tempo real: a sala e a vitrine ficam escutando antes do próximo lance
+  const room = await listen(`/lots/${lotId}/events`);
+  const showcase = await listen('/lots/events');
+
   console.log('\n3) Dois lances simultâneos do mesmo licitante (trava FOR UPDATE)');
   const [x, y] = await Promise.all([bid(t.b2, lotId, 130000), bid(t.b2, lotId, 130000)]);
   const statuses = [x.status, y.status].sort();
   check('exatamente um é aceito e o outro recusado', statuses[0] === 201 && statuses[1] === 409, `(vieram ${statuses})`);
+
+  console.log('\n3b) Tempo real (SSE)');
+  check('GET /lots/:id/events abre um fluxo text/event-stream', /text\/event-stream/.test(room.res.headers.get('content-type') ?? ''));
+  const ev = await room.waitFor((e) => e.type === 'bid' && e.currentBid === 130000);
+  check('a sala recebe o lance novo na hora', !!ev, `(eventos: ${JSON.stringify(room.events)})`);
+  check('o evento traz o próximo lance mínimo', ev?.nextMinBid === 140000, `(nextMinBid=${ev?.nextMinBid})`);
+  check('o lance recusado não gera evento', room.events.filter((e) => e.type === 'bid' && e.currentBid === 130000).length === 1);
+  check('privacidade: o evento não traz quem deu o lance', !!ev && !('bidderId' in ev) && !('bidderCode' in ev));
+  check('a vitrine também recebe o evento do lote', !!(await showcase.waitFor((e) => e.lotId === lotId && e.type === 'bid')));
+  room.close();
+  showcase.close();
 
   console.log('\n4) Auditoria pública (sem login)');
   const audit = await api('GET', `/audit/${lotId}`);
