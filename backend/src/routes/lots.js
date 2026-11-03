@@ -4,6 +4,7 @@ import { pool } from '../db/pool.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { getArtwork, ExternalApiError } from '../services/artic.js';
 import { fetchMuseumImage, getArtworkImage } from '../services/images.js';
+import { publish, sseHandler } from '../services/events.js';
 
 const router = Router();
 
@@ -149,6 +150,7 @@ router.post('/', requireAuth, requireRole('auctioneer'), async (req, res) => {
       console.error('Não deu para guardar a imagem do lote agora:', err.message)
     );
 
+    publish(result.rows[0].id, { type: 'created' });
     res.status(201).json(formatLot(result.rows[0], { detail: true }));
   } catch (err) {
     if (err instanceof ExternalApiError) {
@@ -160,6 +162,15 @@ router.post('/', requireAuth, requireRole('auctioneer'), async (req, res) => {
     console.error('Erro ao criar lote:', err.code, err.message);
     res.status(500).json({ error: 'Erro interno' });
   }
+});
+
+// Tempo real (SSE, público): a vitrine assina todos os lotes; a sala, só o seu.
+// Declarada antes de '/:id' para "events" não ser lido como id.
+router.get('/events', sseHandler('all'));
+router.get('/:id/events', (req, res) => {
+  const id = idSchema.safeParse(req.params.id);
+  if (!id.success) return res.status(400).json({ error: 'Id inválido' });
+  return sseHandler(`lot:${id.data}`)(req, res);
 });
 
 // Vitrine pública (sem login). Nunca devolve lotes cancelados.

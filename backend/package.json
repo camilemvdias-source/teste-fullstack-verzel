@@ -4,7 +4,7 @@
   "description": "",
   "main": "src/server.js",
   "scripts": {
-    "test": "node --test tests/audit.test.js",
+    "test": "node --test tests/audit.test.js tests/events.test.js",
     "e2e": "node scripts/e2e-day5.js",
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",

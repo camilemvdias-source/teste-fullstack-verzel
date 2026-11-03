@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { pool } from '../db/pool.js';
+import { publish } from './events.js';
 
 // Cada lote é liquidado isoladamente. O lock e o status terminal tornam o job idempotente.
 export async function settleExpiredLots() {
@@ -56,6 +57,7 @@ export async function settleExpiredLots() {
         await client.query("UPDATE lots SET status = 'ended', winner_id = NULL, final_price = NULL WHERE id = $1", [lot.id]);
       }
       await client.query('COMMIT');
+      publish(lot.id, { type: 'ended' });
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
       console.error(`Falha ao liquidar lote ${candidate.id}:`, err.code, err.message);

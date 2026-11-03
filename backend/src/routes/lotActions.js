@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { publish } from '../services/events.js';
 
 const router = Router();
 
@@ -57,6 +58,7 @@ router.post('/:id/cancel', requireAuth, requireRole('auctioneer'), async (req, r
 
     await client.query(`UPDATE lots SET status = 'cancelled' WHERE id = $1`, [lot.id]);
     await client.query('COMMIT');
+    publish(lot.id, { type: 'cancelled' });
 
     res.json({ id: lot.id, status: 'cancelled' });
   } catch (err) {

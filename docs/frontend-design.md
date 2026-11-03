@@ -71,5 +71,10 @@ primeira visita.
 
 ## Fora do escopo agora
 
-TypeScript e SSE (tempo real) ficam para depois; a estrutura atual (hooks + `api/client.js`)
-já facilita as duas migrações.
+TypeScript fica para depois; a estrutura atual (hooks + `api/client.js`) já facilita a migração.
+
+## Tempo real
+
+A sala do lote e a vitrine recebem eventos do servidor (SSE) pelo hook `useLiveEvents`. Ao chegar
+um lance, a sala mostra o aviso "Novo lance agora", o preço pisca em dourado e o selo do painel
+indica "Tempo real". Se a conexão cair, o selo mostra "Reconectando…" e a tela volta ao polling.
