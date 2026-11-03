@@ -50,6 +50,20 @@ const listSchema = z.object({
 
 const idSchema = z.coerce.number().int().positive();
 
+// Vistas da galeria do lote: a obra inteira e três detalhes (região IIIF em %: x,y,largura,altura)
+export const VIEWS = [
+  { label: 'Obra inteira', region: 'full' },
+  { label: 'Detalhe · centro', region: 'pct:30,20,40,40' },
+  { label: 'Detalhe · inferior esquerdo', region: 'pct:5,50,42,42' },
+  { label: 'Detalhe · inferior direito', region: 'pct:53,50,42,42' },
+];
+const viewSchema = z.coerce.number().int().min(0).max(VIEWS.length - 1);
+
+function viewUrl(imageUrl, view) {
+  if (!imageUrl || view === 0) return imageUrl;
+  return imageUrl.replace('/full/', `/${VIEWS[view].region}/`);
+}
+
 // Colunas que a API devolve (formatLot). Listadas à mão para que colunas novas
 // ou internas (auctioneer_id, current_leader_id, last_hash...) não vazem na resposta.
 const LOT_COLUMNS = `id, title, attributes, external_id, starting_bid, min_increment,
@@ -84,6 +98,7 @@ function formatLot(row, { detail = false } = {}) {
     lot.externalId = row.external_id;
     lot.attributes = row.attributes;
     lot.serverTime = row.server_time;
+    lot.views = VIEWS.map((v) => v.label);
   }
 
   return lot;
@@ -215,13 +230,17 @@ router.get('/:id', async (req, res) => {
 
 // Imagem do lote, servida pela nossa API a partir da cópia no banco (ver services/images.js).
 // Só aceita a URL já gravada no lote e só do domínio do museu (não é um proxy aberto).
+// ?v=1..3 devolve um detalhe ampliado da obra: o servidor IIIF do museu recorta uma
+// região da imagem original em alta resolução (o museu tem uma foto só por pintura).
 router.get('/:id/image', async (req, res) => {
   const id = idSchema.safeParse(req.params.id);
   if (!id.success) return res.status(400).json({ error: 'Id inválido' });
+  const view = viewSchema.safeParse(req.query.v ?? 0);
+  if (!view.success) return res.status(400).json({ error: 'Vista inválida' });
 
   try {
     const result = await pool.query('SELECT image_url FROM lots WHERE id = $1', [id.data]);
-    const url = result.rows[0]?.image_url;
+    const url = viewUrl(result.rows[0]?.image_url, view.data);
     const img = url ? await getArtworkImage(url) : null;
     if (!img) return res.status(404).json({ error: 'Imagem não encontrada' });
 

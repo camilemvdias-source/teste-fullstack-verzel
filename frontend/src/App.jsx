@@ -1,4 +1,3 @@
-import { Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout.jsx';
 import Home from './pages/Home.jsx';
 import Login from './pages/Login.jsx';
@@ -9,6 +8,8 @@ import CreateLot from './pages/CreateLot.jsx';
 import MyBids from './pages/MyBids.jsx';
 import Receipt from './pages/Receipt.jsx';
 import Audit from './pages/Audit.jsx';
+import { EmptyState } from './components/States.jsx';
+import { Link, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 export default function App() {
@@ -24,7 +25,7 @@ export default function App() {
         <Route path="comprovante/:token" element={<Receipt />} />
         <Route path="auditoria/:lotId" element={<Audit />} />
         <Route path="carteira" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
-        <Route path="*" element={<p className="center muted">Página não encontrada.</p>} />
+        <Route path="*" element={<div className="page"><EmptyState title="Página não encontrada" action={<Link to="/" className="btn">Voltar ao catálogo</Link>}>O endereço pode estar errado ou a página mudou de lugar.</EmptyState></div>} />
       </Route>
     </Routes>
   );
