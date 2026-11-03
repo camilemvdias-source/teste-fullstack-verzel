@@ -4,17 +4,20 @@ import { api } from '../api/client.js';
 import ArtImage from '../components/ArtImage.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { RowSkeletons } from '../components/Skeleton.jsx';
+import { EmptyState, ErrorState, LotNumber, Notice, PageHeader } from '../components/States.jsx';
 import { brl, formatDateTime } from '../lib/format.js';
 
 export default function MyLots() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [ok, setOk] = useState('');
   const [cancelingId, setCancelingId] = useState(null);
 
   const load = useCallback(async () => {
     try {
       setData(await api('/my-lots'));
+      setError('');
     } catch (err) {
       setError(err.message);
     }
@@ -28,15 +31,15 @@ export default function MyLots() {
 
   async function handleCancel(lot) {
     if (!window.confirm(`Cancelar o lote "${lot.title}"? Isso não pode ser desfeito.`)) return;
-    setError('');
+    setActionError('');
     setOk('');
     setCancelingId(lot.id);
     try {
       await api(`/lots/${lot.id}/cancel`, { method: 'POST' });
-      setOk('Lote cancelado.');
+      setOk(`Lote Nº ${String(lot.id).padStart(3, '0')} cancelado.`);
       await load();
     } catch (err) {
-      setError(err.message);
+      setActionError(err.message);
       load(); // pode ter recebido um lance neste instante
     } finally {
       setCancelingId(null);
@@ -44,56 +47,58 @@ export default function MyLots() {
   }
 
   return (
-    <>
-      <div className="page-head">
-        <h1>Meus lotes</h1>
-        <Link to="/meus-lotes/novo" className="btn btn-primary" style={{ textDecoration: 'none' }}>
-          Novo lote
-        </Link>
-      </div>
+    <div className="page">
+      <PageHeader
+        eyebrow="Leiloeiro"
+        title="Meus lotes"
+        actions={<Link to="/meus-lotes/novo" className="btn btn-primary">+ Novo lote</Link>}
+      >
+        Lotes só podem ser cancelados antes do primeiro lance.
+      </PageHeader>
 
-      {error && <div className="alert alert-error" role="alert">{error}</div>}
-      {ok && <div className="alert alert-success" role="status">{ok}</div>}
+      {ok && <Notice kind="success">{ok}</Notice>}
+      {actionError && <Notice kind="error">{actionError}</Notice>}
 
       {data && (
-        <div className="balance-grid" style={{ marginBottom: 16 }}>
-          <div className="card"><span className="muted">Total recebido</span><strong>{brl(data.summary.totalReceived)}</strong></div>
-          <div className="card"><span className="muted">Lotes vendidos</span><strong>{data.summary.soldCount}</strong></div>
+        <div className="stats">
+          <div className="stat"><span className="eyebrow">Total recebido</span><strong>{brl(data.summary.totalReceived)}</strong></div>
+          <div className="stat"><span className="eyebrow">Lotes vendidos</span><strong>{data.summary.soldCount}</strong></div>
+          <div className="stat"><span className="eyebrow">Lotes publicados</span><strong>{data.items.length}</strong></div>
         </div>
       )}
 
+      {error && !data && <ErrorState message={error} onRetry={load} />}
       {!data && !error && <RowSkeletons />}
-      {data?.items.length === 0 && <p className="center muted">Você ainda não criou nenhum lote.</p>}
+      {data?.items.length === 0 && (
+        <EmptyState title="Você ainda não criou nenhum lote" action={<Link to="/meus-lotes/novo" className="btn btn-primary">Criar o primeiro lote</Link>}>
+          Escolha uma pintura do acervo do museu, defina o lance inicial e as datas.
+        </EmptyState>
+      )}
 
-      <div className="stack">
+      <div className="rows">
         {data?.items.map((lot) => (
-          <div key={lot.id} className="row-lot">
-            <ArtImage className="row-thumb" lotId={lot.id} alt={lot.title} />
-            <div className="row-lot-info">
+          <div key={lot.id} className="row">
+            <ArtImage lotId={lot.id} alt="" sold={lot.result?.sold} />
+            <div className="row-main">
+              <div className="row-top"><LotNumber id={lot.id} /><StatusBadge status={lot.status} /></div>
               {lot.status === 'cancelled'
-                ? <span className="status status-cancelled">Lote {lot.id} · Cancelado</span>
-                : <span className="lot-meta-line">Lote {lot.id} <StatusBadge status={lot.status} /></span>}
-              <h3>{lot.title}</h3>
-              <small className="muted">
-                {formatDateTime(lot.startsAt)} → {formatDateTime(lot.endsAt)} · {lot.bidCount} {lot.bidCount === 1 ? 'lance' : 'lances'}
-              </small>
-              <span>
-                {lot.currentBid == null ? `Lance inicial ${brl(lot.startingBid)}` : `Lance atual ${brl(lot.currentBid)}`}
-              </span>
-              {lot.result && (
-                <strong className={lot.result.sold ? 'pos' : 'muted'}>
-                  {lot.result.sold
-                    ? `Vendido por ${brl(lot.result.finalPrice)} · Licitante #${lot.result.winnerCode}`
-                    : lot.bidCount > 0
-                      ? 'Encerrado · liquidando…' // a liquidação roda a cada 5 s
-                      : 'Encerrado sem lances'}
-                </strong>
+                ? <span className="row-title muted">{lot.title}</span>
+                : <Link to={`/lotes/${lot.id}`} className="row-title" style={{ textDecoration: 'none' }}>{lot.title}</Link>}
+              <div className="row-figs">
+                {lot.result?.sold
+                  ? <span>Vendido por<b>{brl(lot.result.finalPrice)}</b> para <b className="mono">#{lot.result.winnerCode}</b></span>
+                  : <span>{lot.currentBid == null ? 'Lance inicial' : 'Lance atual'}<b>{brl(lot.currentBid ?? lot.startingBid)}</b></span>}
+                <span>Lances<b>{lot.bidCount}</b></span>
+                <span>Período<b>{formatDateTime(lot.startsAt)} → {formatDateTime(lot.endsAt)}</b></span>
+              </div>
+              {lot.result && !lot.result.sold && (
+                <span className="small muted">{lot.bidCount > 0 ? 'Encerrado · liquidando…' : 'Encerrado sem lances'}</span>
               )}
             </div>
-            <div className="row-lot-actions">
-              {lot.status !== 'cancelled' && <Link to={`/lotes/${lot.id}`}>Ver lote</Link>}
+            <div className="row-actions">
+              {lot.status !== 'cancelled' && <Link to={`/lotes/${lot.id}`} className="btn btn-ghost btn-sm">Ver sala</Link>}
               {lot.canCancel && (
-                <button className="btn" onClick={() => handleCancel(lot)} disabled={cancelingId === lot.id}>
+                <button className="btn btn-sm btn-danger" onClick={() => handleCancel(lot)} disabled={cancelingId === lot.id}>
                   {cancelingId === lot.id ? 'Cancelando…' : 'Cancelar'}
                 </button>
               )}
@@ -101,6 +106,6 @@ export default function MyLots() {
           </div>
         ))}
       </div>
-    </>
+    </div>
   );
 }

@@ -1,13 +1,18 @@
 import { useState } from 'react';
-import { API_URL } from '../api/client.js';
+import { lotImageUrl } from '../lib/images.js';
 
-// Imagem da obra servida pela nossa API (cópia guardada no banco). Se falhar, mostra um aviso.
-export default function ArtImage({ lotId, src, alt, className }) {
+// Obra num passe-partout. "cover" preenche o quadro (cartões e miniaturas);
+// sem ele, a obra aparece inteira, sem cortes.
+export default function ArtImage({ lotId, view = 0, src, alt, className = '', cover = false, sold = false, eager = false }) {
   const [failed, setFailed] = useState(false);
-  const url = src ?? (lotId ? `${API_URL}/lots/${lotId}/image` : null);
+  const url = src ?? (lotId ? lotImageUrl(lotId, view) : null);
 
-  if (!url || failed) {
-    return <div className={`img-fallback ${className ?? ''}`} role="img" aria-label={alt}>Imagem indisponível</div>;
-  }
-  return <img className={className} src={url} alt={alt} loading="lazy" onError={() => setFailed(true)} />;
+  return (
+    <div className={`art-mat ${cover ? 'art-cover' : ''} ${className}`}>
+      {!url || failed
+        ? <div className="img-fallback" role="img" aria-label={alt}>Imagem indisponível</div>
+        : <img src={url} alt={alt} loading={eager ? 'eager' : 'lazy'} onError={() => setFailed(true)} />}
+      {sold && <span className="sold-dot" title="Arrematado" aria-label="Arrematado" />}
+    </div>
+  );
 }

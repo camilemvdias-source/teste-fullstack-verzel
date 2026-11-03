@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth.js';
 import { ApiError } from '../api/client.js';
+import { Notice } from '../components/States.jsx';
 
 // A API de cadastro devolve { details: { campo: ["mensagem"] } }. Pegamos a primeira mensagem.
 function firstMessage(err) {
@@ -11,6 +12,13 @@ function firstMessage(err) {
   }
   return err.message;
 }
+
+const DEMO = [
+  { email: 'licitante1@teste.com', role: 'Licitante' },
+  { email: 'licitante2@teste.com', role: 'Licitante' },
+  { email: 'leiloeiro@teste.com', role: 'Leiloeiro' },
+];
+const DEMO_PASSWORD = 'Leilao@2026';
 
 export default function Login() {
   const { user, loading, login, register } = useAuth();
@@ -25,7 +33,7 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
 
   // Ainda confirmando quem é a pessoa (há token guardado): não mostra o formulário por engano
-  if (loading) return <p className="center muted">Carregando…</p>;
+  if (loading) return <div className="page"><div className="skeleton" style={{ height: 420, maxWidth: 440, margin: '0 auto' }} /></div>;
 
   // Já está logado (ou acabou de entrar): volta para a página que pediu o login.
   // É o único redirecionamento: um navigate() no submit competia com este e a pessoa ia para o início.
@@ -38,16 +46,11 @@ export default function Login() {
     setError('');
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function submit(fn) {
     setError('');
     setSubmitting(true);
     try {
-      if (isRegister) {
-        await register({ name, email, password, role });
-      } else {
-        await login(email, password);
-      }
+      await fn();
     } catch (err) {
       setError(firstMessage(err));
     } finally {
@@ -55,28 +58,52 @@ export default function Login() {
     }
   }
 
+  function handleSubmit(e) {
+    e.preventDefault();
+    submit(() => (isRegister ? register({ name, email, password, role }) : login(email, password)));
+  }
+
   return (
-    <div className="auth-wrap">
-      <div className="card">
-        <h1>{isRegister ? 'Criar conta' : 'Entrar'}</h1>
+    <div className="auth">
+      <div className="auth-art">
+        <blockquote>“Cada lance fica selado. Qualquer pessoa pode conferir que ninguém mexeu no histórico.”</blockquote>
+        <ul>
+          <li>Obras em domínio público do Art Institute of Chicago</li>
+          <li>Seu saldo fica reservado só enquanto você lidera</li>
+          <li>Lances nos últimos 2 minutos prorrogam o leilão</li>
+        </ul>
+      </div>
 
-        <div className="tabs" role="tablist">
-          <button type="button" className={`tab ${!isRegister ? 'active' : ''}`} onClick={() => switchMode('login')}>
-            Entrar
-          </button>
-          <button type="button" className={`tab ${isRegister ? 'active' : ''}`} onClick={() => switchMode('register')}>
-            Criar conta
-          </button>
+      <div className="auth-form">
+        <div className="segmented" role="tablist" aria-label="Entrar ou criar conta" style={{ alignSelf: 'flex-start' }}>
+          <button type="button" role="tab" aria-selected={!isRegister} onClick={() => switchMode('login')}>Entrar</button>
+          <button type="button" role="tab" aria-selected={isRegister} onClick={() => switchMode('register')}>Criar conta</button>
         </div>
+        <h1>{isRegister ? 'Crie sua conta' : 'Bem-vindo de volta'}</h1>
 
-        {error && <div className="alert alert-error" role="alert">{error}</div>}
+        {error && <Notice kind="error">{error}</Notice>}
 
         <form onSubmit={handleSubmit}>
           {isRegister && (
-            <div className="field">
-              <label htmlFor="name">Nome</label>
-              <input id="name" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} autoComplete="name" />
-            </div>
+            <>
+              <span className="eyebrow" style={{ marginBottom: 8 }}>Você vai</span>
+              <div className="roles" role="radiogroup" aria-label="Tipo de conta">
+                <label className={`role-option ${role === 'bidder' ? 'selected' : ''}`}>
+                  <input type="radio" name="role" value="bidder" checked={role === 'bidder'} onChange={() => setRole('bidder')} />
+                  <strong>Dar lances</strong>
+                  <small>Conta de licitante</small>
+                </label>
+                <label className={`role-option ${role === 'auctioneer' ? 'selected' : ''}`}>
+                  <input type="radio" name="role" value="auctioneer" checked={role === 'auctioneer'} onChange={() => setRole('auctioneer')} />
+                  <strong>Leiloar obras</strong>
+                  <small>Conta de leiloeiro</small>
+                </label>
+              </div>
+              <div className="field">
+                <label htmlFor="name">Nome</label>
+                <input id="name" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} autoComplete="name" />
+              </div>
+            </>
           )}
 
           <div className="field">
@@ -92,32 +119,25 @@ export default function Login() {
               required minLength={isRegister ? 6 : 1}
               autoComplete={isRegister ? 'new-password' : 'current-password'}
             />
-            {isRegister && <small className="muted">Mínimo de 6 caracteres.</small>}
+            {isRegister && <span className="hint">Mínimo de 6 caracteres.</span>}
           </div>
 
-          {isRegister && (
-            <div className="roles">
-              <label className={`role-option ${role === 'bidder' ? 'selected' : ''}`}>
-                <input type="radio" name="role" value="bidder" checked={role === 'bidder'} onChange={() => setRole('bidder')} />
-                <strong>Licitante</strong>
-                <small>Dá lances e arremata</small>
-              </label>
-              <label className={`role-option ${role === 'auctioneer' ? 'selected' : ''}`}>
-                <input type="radio" name="role" value="auctioneer" checked={role === 'auctioneer'} onChange={() => setRole('auctioneer')} />
-                <strong>Leiloeiro</strong>
-                <small>Cria e gerencia lotes</small>
-              </label>
-            </div>
-          )}
-
-          <button className="btn btn-primary btn-block" type="submit" disabled={submitting}>
+          <button className="btn btn-primary btn-block btn-lg" type="submit" disabled={submitting}>
             {submitting ? 'Aguarde…' : isRegister ? 'Criar conta' : 'Entrar'}
           </button>
         </form>
+
         {!isRegister && (
-          <p className="demo-accounts">
-            Contas de teste (senha <code>Leilao@2026</code>): <code>leiloeiro@teste.com</code>, <code>licitante1@teste.com</code> e <code>licitante2@teste.com</code>.
-          </p>
+          <div className="demo">
+            <span className="eyebrow">Contas de demonstração · senha <span className="mono">{DEMO_PASSWORD}</span></span>
+            <div className="demo-list">
+              {DEMO.map((d) => (
+                <button key={d.email} type="button" disabled={submitting} onClick={() => submit(() => login(d.email, DEMO_PASSWORD))}>
+                  <code>{d.email}</code><span className="muted small">{d.role} →</span>
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
