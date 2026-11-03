@@ -1,3 +1,4 @@
+# Antes: copie .env.example para .env e preencha os segredos.
 # Sobe tudo com:  docker compose up --build
 #   Front-end: http://localhost:5173
 #   API:       http://localhost:3000/health
@@ -24,9 +25,10 @@ services:
       DATABASE_URL: postgres://leilao:leilao@db:5432/leilao
       DATABASE_SSL: "false"
       PORT: "3000"
-      JWT_SECRET: troque-este-segredo-no-docker
-      PUBLIC_CODE_SECRET: troque-este-outro-segredo-no-docker
-      AUDIT_SECRET: troque-a-chave-da-auditoria-no-docker
+      # Segredos vêm do .env da raiz (não versionado). Modelo: .env.example
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
+      PUBLIC_CODE_SECRET: ${PUBLIC_CODE_SECRET:?defina PUBLIC_CODE_SECRET no .env}
+      AUDIT_SECRET: ${AUDIT_SECRET:?defina AUDIT_SECRET no .env}
       FRONTEND_URL: http://localhost:5173
       DEMO_KEEPALIVE: "true"
     ports:

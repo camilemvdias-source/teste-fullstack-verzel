@@ -50,6 +50,11 @@ const listSchema = z.object({
 
 const idSchema = z.coerce.number().int().positive();
 
+// Colunas que a API devolve (formatLot). Listadas à mão para que colunas novas
+// ou internas (auctioneer_id, current_leader_id, last_hash...) não vazem na resposta.
+const LOT_COLUMNS = `id, title, attributes, external_id, starting_bid, min_increment,
+  current_bid, bid_count, starts_at, ends_at, final_price`;
+
 // Não expõe nada do leiloeiro (nome, e-mail) nem do líder: só dados do lote.
 function formatLot(row, { detail = false } = {}) {
   const startingBid = Number(row.starting_bid);
@@ -63,7 +68,6 @@ function formatLot(row, { detail = false } = {}) {
     // Nome curto do artista para a vitrine ("Claude Monet", sem nacionalidade e datas)
     artist: attrs.artistName || attrs.artist?.split('\n')[0] || null,
     date: attrs.date ?? null,
-    imageUrl: row.image_url,
     status: row.effective_status,
     startingBid,
     minIncrement,
@@ -164,8 +168,8 @@ router.get('/', async (req, res) => {
     // Ordem: ao vivo (quem termina antes primeiro), agendados (quem começa
     // antes primeiro) e encerrados (os mais recentes primeiro).
     const result = await pool.query(
-      `SELECT * FROM (
-         SELECT lots.*, ${STATUS_SQL} AS effective_status FROM lots
+      `SELECT t.* FROM (
+         SELECT ${LOT_COLUMNS}, ${STATUS_SQL} AS effective_status FROM lots
        ) AS t
        WHERE ${where}
        ORDER BY
@@ -192,7 +196,7 @@ router.get('/:id', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT *, ${STATUS_SQL} AS effective_status, now() AS server_time
+      `SELECT ${LOT_COLUMNS}, ${STATUS_SQL} AS effective_status, now() AS server_time
        FROM lots WHERE id = $1`,
       [id.data]
     );

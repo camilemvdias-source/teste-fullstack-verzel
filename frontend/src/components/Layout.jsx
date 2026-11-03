@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext.jsx';
+import { useAuth } from '../auth/useAuth.js';
 import { UserIcon, HomeIcon, GavelIcon, MoonIcon, SunIcon, WalletIcon } from './Icons.jsx';
 import { currentTheme, setTheme } from '../lib/theme.js';
 import { brl } from '../lib/format.js';
 import Logo from './Logo.jsx';
 
+
+const YEAR = new Date().getFullYear();
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -83,7 +85,7 @@ export default function Layout() {
           </nav>
         </div>
         <div className="footer-legal">
-          <span>© {new Date().getFullYear()} Aurelia Leilões de Arte</span>
+          <span>© {YEAR} Aurelia Leilões de Arte</span>
           <span>Imagens: Art Institute of Chicago (CC0)</span>
         </div>
       </footer>

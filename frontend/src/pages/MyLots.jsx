@@ -21,9 +21,9 @@ export default function MyLots() {
   }, []);
 
   useEffect(() => {
-    load();
+    const first = setTimeout(load, 0);
     const t = setInterval(load, 10000);
-    return () => clearInterval(t);
+    return () => { clearTimeout(first); clearInterval(t); };
   }, [load]);
 
   async function handleCancel(lot) {
@@ -32,8 +32,8 @@ export default function MyLots() {
     setOk('');
     setCancelingId(lot.id);
     try {
-      const res = await api(`/lots/${lot.id}/cancel`, { method: 'POST' });
-      setOk(res.refunded > 0 ? `Lote cancelado. ${brl(res.refunded)} devolvidos ao líder.` : 'Lote cancelado.');
+      await api(`/lots/${lot.id}/cancel`, { method: 'POST' });
+      setOk('Lote cancelado.');
       await load();
     } catch (err) {
       setError(err.message);

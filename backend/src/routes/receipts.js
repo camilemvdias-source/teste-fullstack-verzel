@@ -17,7 +17,7 @@ router.get('/:publicToken', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT r.amount, r.final_hash, r.created_at,
-              l.id AS lot_id, l.title, l.image_url, l.attributes, l.ends_at,
+              l.id AS lot_id, l.title, l.attributes, l.ends_at,
               w.public_code AS winner_code
        FROM receipts r
        JOIN lots l ON l.id = r.lot_id
@@ -36,7 +36,6 @@ router.get('/:publicToken', async (req, res) => {
         lot: {
           id: row.lot_id,
           title: row.title,
-          imageUrl: row.image_url,
           attributes: row.attributes,
           endedAt: row.ends_at,
         },

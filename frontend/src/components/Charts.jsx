@@ -1,10 +1,12 @@
 import { brl } from '../lib/format.js';
+import { useCountdown } from '../hooks/useCountdown.js';
 
 // Quanto do leilão já passou (0 a 1), do início ao fim
-export function TimeBar({ startsAt, endsAt, now = Date.now(), urgent = false }) {
+export function TimeBar({ startsAt, endsAt, urgent = false }) {
+  const { ms } = useCountdown(endsAt);
   const start = Date.parse(startsAt);
   const end = Date.parse(endsAt);
-  const done = Math.min(1, Math.max(0, (now - start) / (end - start)));
+  const done = Math.min(1, Math.max(0, 1 - ms / (end - start)));
   return (
     <div className={`timebar ${urgent ? 'urgent' : ''}`} role="progressbar" aria-label="Tempo de leilão decorrido" aria-valuenow={Math.round(done * 100)} aria-valuemin={0} aria-valuemax={100}>
       <i style={{ width: `${done * 100}%` }} />

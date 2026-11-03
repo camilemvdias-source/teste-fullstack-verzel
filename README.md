@@ -249,7 +249,11 @@ Grava direto no banco (não precisa da API no ar; use o mesmo `AUDIT_SECRET` da 
 
 ## Rodar com Docker
 
-Precisa do Docker Desktop. Na raiz do projeto:
+Precisa do Docker Desktop. Na raiz do projeto, crie o `.env` com os segredos (modelo em `.env.example`; o arquivo não vai para o Git) e suba:
+
+```powershell
+Copy-Item .env.example .env
+```
 
 ```bash
 docker compose up --build

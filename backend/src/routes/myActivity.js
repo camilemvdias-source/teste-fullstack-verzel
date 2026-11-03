@@ -10,7 +10,7 @@ const router = Router();
 router.get('/bids', requireAuth, requireRole('bidder'), async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT l.id, l.title, l.image_url, l.status, l.ends_at, l.current_bid,
+      `SELECT l.id, l.title, l.status, l.ends_at, l.current_bid,
               l.current_leader_id, l.winner_id, l.final_price,
               s.my_best_bid, s.my_bid_count,
               (CASE
@@ -47,7 +47,6 @@ router.get('/bids', requireAuth, requireRole('bidder'), async (req, res) => {
       return {
         lotId: row.id,
         title: row.title,
-        imageUrl: row.image_url,
         status: row.effective_status,
         endsAt: row.ends_at,
         currentBid: row.current_bid == null ? null : Number(row.current_bid),
@@ -81,7 +80,6 @@ router.get('/wins', requireAuth, requireRole('bidder'), async (req, res) => {
       items: result.rows.map((row) => ({
         lotId: row.lot_id,
         title: row.title,
-        imageUrl: row.image_url,
         amount: Number(row.amount),
         wonAt: row.created_at,
         receiptToken: row.public_token,

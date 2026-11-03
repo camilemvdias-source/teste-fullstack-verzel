@@ -77,3 +77,10 @@ CREATE TABLE IF NOT EXISTS artwork_images (
 
 CREATE INDEX IF NOT EXISTS idx_bids_lot ON bids(lot_id);
 CREATE INDEX IF NOT EXISTS idx_lots_status_end ON lots(status, ends_at);
+CREATE INDEX IF NOT EXISTS idx_lots_auctioneer ON lots(auctioneer_id);
+CREATE INDEX IF NOT EXISTS idx_lots_winner ON lots(winner_id);
+CREATE INDEX IF NOT EXISTS idx_lots_leader ON lots(current_leader_id);
+CREATE INDEX IF NOT EXISTS idx_bids_bidder ON bids(bidder_id);
+CREATE INDEX IF NOT EXISTS idx_receipts_winner ON receipts(winner_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_user ON ledger(user_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_lot ON ledger(lot_id);

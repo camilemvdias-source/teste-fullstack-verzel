@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext.jsx';
+import { useAuth } from '../auth/useAuth.js';
 import { ApiError } from '../api/client.js';
 
 // A API de cadastro devolve { details: { campo: ["mensagem"] } }. Pegamos a primeira mensagem.

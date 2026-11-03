@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext.jsx';
+import { useAuth } from '../auth/useAuth.js';
 
 // Uso: <ProtectedRoute role="bidder"><Pagina /></ProtectedRoute>
 // Sem "role", basta estar logado.

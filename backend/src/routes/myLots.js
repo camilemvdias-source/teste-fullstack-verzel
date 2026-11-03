@@ -8,7 +8,7 @@ const router = Router();
 router.get('/', requireAuth, requireRole('auctioneer'), async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT l.id, l.title, l.image_url, l.status, l.starts_at, l.ends_at,
+      `SELECT l.id, l.title, l.status, l.starts_at, l.ends_at,
               l.starting_bid, l.current_bid, l.bid_count, l.winner_id,
               l.final_price, w.public_code AS winner_code,
               (CASE
@@ -39,7 +39,6 @@ router.get('/', requireAuth, requireRole('auctioneer'), async (req, res) => {
       return {
         id: row.id,
         title: row.title,
-        imageUrl: row.image_url,
         status,
         startsAt: row.starts_at,
         endsAt: row.ends_at,

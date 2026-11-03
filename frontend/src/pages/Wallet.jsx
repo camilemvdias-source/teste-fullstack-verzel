@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
-import { useAuth } from '../auth/AuthContext.jsx';
+import { useAuth } from '../auth/useAuth.js';
 import { brl, formatDateTime, parseBrlToCents } from '../lib/format.js';
 import { BalanceBar } from '../components/Charts.jsx';
 
@@ -27,7 +27,10 @@ export default function Wallet() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const first = setTimeout(load, 0);
+    return () => clearTimeout(first);
+  }, [load]);
 
   async function handleDeposit(e) {
     e.preventDefault();

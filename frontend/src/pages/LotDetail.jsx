@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client.js';
-import { useAuth } from '../auth/AuthContext.jsx';
+import { useAuth } from '../auth/useAuth.js';
 import ArtImage from '../components/ArtImage.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import LotCard from '../components/LotCard.jsx';
@@ -68,10 +68,10 @@ function LotRoom({ id }) {
   }, [id, role]);
 
   useEffect(() => {
-    load();
     // Lance novo de outra pessoa aparece em poucos segundos (polling de 2s)
+    const first = setTimeout(load, 0);
     const t = setInterval(load, 2000);
-    return () => clearInterval(t);
+    return () => { clearTimeout(first); clearInterval(t); };
   }, [load]);
 
   useEffect(() => {
@@ -81,7 +81,7 @@ function LotRoom({ id }) {
       .catch(() => {});
   }, [id]);
 
-  const { ms, parts } = useCountdown(lot?.endsAt ?? new Date().toISOString(), lot?.serverTime);
+  const { ms, parts } = useCountdown(lot?.endsAt, lot?.serverTime);
 
   if (notFound) return <p className="center muted">Lote não encontrado. <Link to="/">Voltar aos leilões</Link></p>;
   if (!lot) {

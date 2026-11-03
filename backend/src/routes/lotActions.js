@@ -58,7 +58,7 @@ router.post('/:id/cancel', requireAuth, requireRole('auctioneer'), async (req, r
     await client.query(`UPDATE lots SET status = 'cancelled' WHERE id = $1`, [lot.id]);
     await client.query('COMMIT');
 
-    res.json({ id: lot.id, status: 'cancelled', refunded: 0 });
+    res.json({ id: lot.id, status: 'cancelled' });
   } catch (err) {
     if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Erro ao cancelar lote:', err.code, err.message);
